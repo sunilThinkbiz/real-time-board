@@ -26,19 +26,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         name: user.displayName,
         email: user.email,
         avatar: user.photoURL,
+        online: true,
       });
     } catch (error) {
       console.error("Error saving user data", error);
     }
-    console.log(userRef);
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
       setLoading(false);
-      if (user) {
-        saveUserData(user);
+      if (firebaseUser) {
+        saveUserData(firebaseUser);
       }
     });
     return () => unsubscribe();
@@ -51,6 +51,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
-export const useAuth = () => {
-  return useContext(AuthContext);
-};
+export const useAuth = () => useContext(AuthContext);

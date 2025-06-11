@@ -1,3 +1,4 @@
+// src/components/Auth/Login.tsx
 import React from "react";
 import { signInWithGoogle } from "../../firebase/auth";
 import { LoginContent } from "../../appConstant";
@@ -5,13 +6,17 @@ import { useNavigate } from 'react-router-dom';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-
   const { TITLE, FEATURES, SIGN_IN_WITH_GOOGLE } = LoginContent;
 
   const handleLogin = async () => {
     try {
-      await signInWithGoogle();
-      navigate('/');
+      const result = await signInWithGoogle();
+      const user = result.user;
+      if (user?.uid) {
+        navigate(`/board/${user.uid}`);
+      } else {
+        navigate("/board/default");
+      }
     } catch (error) {
       console.error("Login failed", error);
     }
