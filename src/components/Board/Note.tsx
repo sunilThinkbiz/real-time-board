@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Rnd } from "react-rnd";
 import { Button } from "react-bootstrap";
@@ -33,6 +34,7 @@ const Note: React.FC<NoteProps> = ({
   onTextChange
 }) => {
   const [editText, setEditText] = useState(propText);
+  const isOwner = currentUser === createdBy;
 
   useEffect(() => {
     setEditText(propText);
@@ -42,7 +44,9 @@ const Note: React.FC<NoteProps> = ({
     <Rnd
       default={{ x, y, width, height }}
       bounds="parent"
-      onDragStop={(_, data) => onDragStop(id, data.x, data.y)}
+      disableDragging={!isOwner}
+      enableResizing={isOwner}
+      onDragStop={(_, data) => isOwner && onDragStop(id, data.x, data.y)}
     >
       <div
         className="p-2 rounded"
@@ -61,8 +65,9 @@ const Note: React.FC<NoteProps> = ({
           onChange={(e) => {
             const newText = e.target.value;
             setEditText(newText);
-            onTextChange(id, newText);
+            if (isOwner) onTextChange(id, newText);
           }}
+          disabled={!isOwner}
           style={{
             width: "100%",
             height: "70%",
@@ -70,13 +75,16 @@ const Note: React.FC<NoteProps> = ({
             background: "transparent",
             border: "none",
             fontSize: "14px",
+            cursor: isOwner ? "text" : "not-allowed"
           }}
         />
         <div className="d-flex justify-content-between align-items-center mt-2">
-          <small>{createdBy === currentUser ? "You" : createdBy}</small>
-          <Button variant="danger" size="sm" onClick={() => onDelete(id)}>
-            &times;
-          </Button>
+          <small>{isOwner ? "You" : createdBy}</small>
+          {isOwner && (
+            <Button variant="danger" size="sm" onClick={() => onDelete(id)}>
+              &times;
+            </Button>
+          )}
         </div>
       </div>
     </Rnd>

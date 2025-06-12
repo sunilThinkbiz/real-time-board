@@ -1,3 +1,4 @@
+
 import React from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase/firebaseConfig";
@@ -8,16 +9,14 @@ import { Container, Row, Col } from "react-bootstrap";
 import { BoardProvider } from "../context/BoardContext";
 import { useParams, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { usePresence } from "../hook/usePresence"; // ✅ Import presence hook
+import { usePresence } from "../hook/usePresence";
 
 const Home: React.FC = () => {
   const { user, loading } = useAuth();
   const { boardId } = useParams<{ boardId: string }>();
+  const resolvedBoardId = boardId || user?.uid || null;
 
-  // Provide a fallback to ensure the hook is always called
-  const resolvedBoardId = boardId || user?.uid || "default";
-
-  // ✅ Safe: call usePresence unconditionally
+  // ✅ Always call hooks unconditionally
   usePresence(resolvedBoardId);
 
   const handleLogout = () => signOut(auth);

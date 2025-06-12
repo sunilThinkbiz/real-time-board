@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { database } from "../firebase/firebaseConfig";
-import { ref, onValue, push, remove, update,set  } from "firebase/database";
+import { ref, onValue, push, remove, update, set } from "firebase/database";
+import { auth } from "../firebase/firebaseConfig"; 
 
 interface Note {
   id: string;
@@ -10,6 +11,7 @@ interface Note {
   width?: number;
   height?: number;
   createdBy: string;
+  color?: string;
 }
 
 export const useBoardData = (boardId: string) => {
@@ -17,31 +19,32 @@ export const useBoardData = (boardId: string) => {
 
   useEffect(() => {
     const notesRef = ref(database, `boards/${boardId}/notes`);
-    // Listen for any change to notes in this board
     const unsubscribe = onValue(notesRef, (snapshot) => {
       const data = snapshot.val() || {};
       setNotes(data);
     });
 
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, [boardId]);
 
-  // Add a note
-  const addNote = async (noteData: Omit<Note, 'id'>) => {
-  const notesRef = ref(database, `boards/${boardId}/notes`);
-  const newNoteRef = push(notesRef); // get new child ref
-  await set(newNoteRef, noteData);   // set data at new child location
-};
+  const addNote = async (noteData: Omit<Note, 'id' | 'createdBy'>) => {
+    const uid = auth.currentUser?.uid;
+    if (!uid) throw new Error("User not authenticated");
 
-  // Update note position or text
+    const notesRef = ref(database, `boards/${boardId}/notes`);
+    const newNoteRef = push(notesRef);
+
+    await set(newNoteRef, {
+      ...noteData,
+      createdBy: uid, //  required by Firebase rules
+    });
+  };
+
   const updateNote = (id: string, updatedFields: Partial<Note>) => {
     const noteRef = ref(database, `boards/${boardId}/notes/${id}`);
     return update(noteRef, updatedFields);
   };
 
-  // Delete a note
   const deleteNote = (id: string) => {
     const noteRef = ref(database, `boards/${boardId}/notes/${id}`);
     return remove(noteRef);

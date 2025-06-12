@@ -1,37 +1,37 @@
-// src/firebase/auth.ts
+
 import { auth, database } from "./firebaseConfig";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { ref, set } from "firebase/database";
+import { ref, get, set } from "firebase/database";
 
 const provider = new GoogleAuthProvider();
 
 export const signInWithGoogle = async () => {
-  try {
-    const result = await signInWithPopup(auth, provider);
-    const user = result.user;
+  const result = await signInWithPopup(auth, provider);
+  const user = result.user;
 
-    // Automatically use user.uid as boardId
-    const boardId = user.uid;
+  const globalRef = ref(database, `global/activeBoardId`);
+  let boardId: string;
 
-    await set(ref(database, `boards/${boardId}/users/${user.uid}`), {
-      uid: user.uid,
-      displayName: user.displayName || "",
-      photoURL: user.photoURL || "",
-      email: user.email || "",
-      online: true, // Optional: Mark as online
-    });
-
-    return result;
-  } catch (error) {
-    console.error("Error signing in with Google", error);
-    throw error;
+  const snapshot = await get(globalRef);
+  if (!snapshot.exists()) {
+    boardId = user.uid; // First user creates the board
+    await set(globalRef, boardId);
+  } else {
+    boardId = snapshot.val(); // All others join
   }
+
+  // Add user under the board
+  await set(ref(database, `boards/${boardId}/users/${user.uid}`), {
+    uid: user.uid,
+    displayName: user.displayName || "",
+    email: user.email || "",
+    photoURL: user.photoURL || "",
+    online: true
+  });
+
+  return { result, boardId };
 };
 
 export const logOut = async () => {
-  try {
-    await signOut(auth);
-  } catch (error) {
-    console.error("Error signing out", error);
-  }
+  await signOut(auth);
 };
