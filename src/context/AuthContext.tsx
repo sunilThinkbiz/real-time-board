@@ -1,4 +1,5 @@
-import React, { createContext, useState, useEffect, useContext } from "react";
+
+import React, { createContext, useContext, useState, useEffect } from "react";
 import { auth, database } from "../firebase/firebaseConfig";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { ref, set } from "firebase/database";
@@ -8,37 +9,24 @@ type AuthContextType = {
   loading: boolean;
 };
 
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  loading: true,
-});
+const AuthContext = createContext<AuthContextType>({ user: null, loading: true });
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const saveUserData = async (user: User) => {
-    const userRef = ref(database, `users/${user.uid}`);
-    try {
-      await set(userRef, {
-        name: user.displayName,
-        email: user.email,
-        avatar: user.photoURL,
-        online: true,
-      });
-    } catch (error) {
-      console.error("Error saving user data", error);
-    }
-  };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
       if (firebaseUser) {
-        saveUserData(firebaseUser);
+        const userRef = ref(database, `users/${firebaseUser.uid}`);
+        set(userRef, {
+          name: firebaseUser.displayName,
+          email: firebaseUser.email,
+          avatar: firebaseUser.photoURL,
+          online: true,
+        });
       }
     });
     return () => unsubscribe();
