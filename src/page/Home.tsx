@@ -1,22 +1,45 @@
-// src/page/Home.tsx
 import React from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase/firebaseConfig";
 import Navbar from "../components/Nav";
+import Sidebar from "../components/Board/Sidebar";
+import Canvas from "../components/Board/Canvas";
+import { Container, Row, Col } from "react-bootstrap";
+import { BoardProvider } from "../context/BoardContext";
+import { useParams, Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { usePresence } from "../hook/usePresence"; // ✅ Import presence hook
 
 const Home: React.FC = () => {
-  const handleLogout = () => {
-    signOut(auth);
-  };
+  const { user, loading } = useAuth();
+  const { boardId } = useParams<{ boardId: string }>();
+
+  // Provide a fallback to ensure the hook is always called
+  const resolvedBoardId = boardId || user?.uid || "default";
+
+  // ✅ Safe: call usePresence unconditionally
+  usePresence(resolvedBoardId);
+
+  const handleLogout = () => signOut(auth);
+
+  if (loading) return <div>Loading...</div>;
+  if (!user) return <Navigate to="/login" />;
+  if (!boardId) return <Navigate to={`/board/${user.uid}`} />;
 
   return (
-    <div>
+    <BoardProvider>
       <Navbar onLogout={handleLogout} />
-      <div className="container mt-5">
-        <h2>Welcome to the Board!</h2>
-        <p>This is your real-time interactive board (content to be added).</p>
-      </div>
-    </div>
+      <Container fluid>
+        <Row>
+          <Col xs={2}>
+            <Sidebar />
+          </Col>
+          <Col xs={10}>
+            <Canvas boardId={boardId} />
+          </Col>
+        </Row>
+      </Container>
+    </BoardProvider>
   );
 };
 
