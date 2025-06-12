@@ -28,13 +28,6 @@ const Navbar: React.FC<NavbarProps> = ({ onLogout }) => {
         <BootstrapNavbar.Brand className="fw-bold fs-4">
           {NAVBAR.NAVBAR_TITLE}
         </BootstrapNavbar.Brand>
-
-        <Nav className="mx-3 d-none d-md-flex align-items-center">
-          <span className="text-muted small">
-            <i className="bi bi-cloud me-1"></i> {NAVBAR.SYNC_STATUS}
-          </span>
-        </Nav>
-
         <BootstrapNavbar.Toggle aria-controls="basic-navbar-nav" />
         <BootstrapNavbar.Collapse
           id="basic-navbar-nav"
