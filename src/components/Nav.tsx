@@ -1,4 +1,3 @@
-// src/components/Navbar.tsx
 import React from "react";
 import {
   Navbar as BootstrapNavbar,
@@ -10,11 +9,12 @@ import { useAuth } from "../context/AuthContext";
 import { useParams } from "react-router-dom";
 import { useBoardUsers } from "../hook/useBoardUsers";
 import { NAVBAR } from "../appConstant";
+import Avatar from "./Avatar"; 
+import { BoardUser } from "../types/type";
 
 interface NavbarProps {
   onLogout: () => void;
 }
-
 const Navbar: React.FC<NavbarProps> = ({ onLogout }) => {
   const { user, loading } = useAuth();
   const { boardId } = useParams<{ boardId: string }>();
@@ -34,50 +34,39 @@ const Navbar: React.FC<NavbarProps> = ({ onLogout }) => {
           className="justify-content-end"
         >
           <Nav className="align-items-center">
+
             {/* Online Users Count */}
             <span className="d-flex align-items-center me-3">
-              <i className="bi bi-people-fill me-1"></i> {onlineUsers.length}{" "}
-              {NAVBAR.ONLINE_LABEL}
+              <i className="bi bi-people-fill me-1"></i>
+              {onlineUsers.length} {NAVBAR.ONLINE_LABEL}
             </span>
 
-            {/* User Avatars */}
+            {/* Online Users Avatars */}
             <div className="d-flex align-items-center me-3">
-              {onlineUsers.map((u: any) => (
-                <div key={u.uid} className="position-relative me-2">
-                  <img
-                    src={u.photoURL || NAVBAR.DEFAULT_AVATAR}
-                    alt={u.displayName || u.email || "User"}
-                    title={u.displayName || u.email}
-                    className="rounded-circle"
-                    style={{
-                      ...NAVBAR.AVATAR_SIZE,
-                      objectFit: "cover",
-                      border: "2px solid #dee2e6",
-                    }}
-                  />
-                  {/* Green online dot */}
-                  <span
-                    className="position-absolute bottom-0 end-0 bg-success border border-white rounded-circle"
-                    style={NAVBAR.ONLINE_DOT_STYLE}
-                  />
-                </div>
+         {onlineUsers
+                .map((u: BoardUser) => (
+                <Avatar
+                  key={u.uid}
+                  user={u}
+                  size={NAVBAR.AVATAR_SIZE}
+                  onlineDotStyle={NAVBAR.ONLINE_DOT_STYLE}
+                />
               ))}
             </div>
 
-            {/* Current user name/email */}
+            {/* Current user name */}
             {!loading && user && (
-              <span
-                className="me-3 text-truncate"
-                style={{ maxWidth: "150px" }}
-              >
+              <span className="me-3 text-truncate" style={{ maxWidth: "150px" }}>
                 {user.displayName || user.email}
               </span>
             )}
 
-            {/* Logout */}
+            {/* Logout Button */}
             <Button variant="danger" onClick={onLogout} className="me-2">
-              <i className="bi bi-box-arrow-right me-2"></i>{NAVBAR.LOGOUT_LABEL}
+              <i className="bi bi-box-arrow-right me-2"></i>
+              {NAVBAR.LOGOUT_LABEL}
             </Button>
+
           </Nav>
         </BootstrapNavbar.Collapse>
       </Container>
