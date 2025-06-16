@@ -6,10 +6,11 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { ref, onValue, set, update, remove, get } from "firebase/database";
+import { ref, onValue, set, update, remove, get, off } from "firebase/database";
 import { database } from "../firebase/firebaseConfig";
 import { useAuth } from "./AuthContext";
 import { v4 as uuid } from "uuid";
+
 
 export type ToolType = "note" | "rectangle" | "circle" | "line" | null;
 
@@ -65,7 +66,8 @@ interface BoardContextType {
 
   selectedElementId: string | null;
   setSelectedElementId: (id: string | null) => void;
-
+cursors: Record<string, any>;
+trackCursor: (x: number, y: number) => void;
   notes: NoteType[];
   shapes: ShapeType[];
 
@@ -85,6 +87,13 @@ interface BoardContextType {
   canUndo: boolean;
   canRedo: boolean;
 }
+export type CursorData = {
+  x: number;
+  y: number;
+  displayName: string;
+  color: string;
+  lastActive: number;
+};
 
 const BoardContext = createContext<BoardContextType | undefined>(undefined);
 
@@ -106,6 +115,8 @@ export const BoardProvider: React.FC<{
   // Individual operation stacks for undo/redo
   const [undoStack, setUndoStack] = useState<Operation[]>([]);
   const [redoStack, setRedoStack] = useState<Operation[]>([]);
+  const [cursors, setCursors] = useState<{ [uid: string]: CursorData }>({});
+
 
   // Track if we're in the middle of an undo/redo operation
   const isUndoRedoOperation = useRef(false);
@@ -167,6 +178,40 @@ export const BoardProvider: React.FC<{
     },
     [userNames]
   );
+
+  // firebase liestner
+useEffect(() => {
+  const interval = setInterval(() => {
+    setCursors((prev) => {
+      const now = Date.now();
+      const filtered: typeof prev = {};
+
+      Object.entries(prev).forEach(([uid, data]) => {
+        if (now - data.lastActive < 30000) {
+          filtered[uid] = data;
+        }
+      });
+
+      return filtered;
+    });
+  }, 10000); // check every 10s
+
+  return () => clearInterval(interval);
+}, []);
+
+
+const trackCursor = (x: number, y: number) => {
+  if (!user || !boardId) return;
+  set(ref(database, `boards/${boardId}/cursors/${user.uid}`), {
+    x,
+    y,
+    displayName: user.displayName || user.email,
+    color: "#007bff",
+    lastActive: Date.now(),
+  });
+};
+
+
 
   // Firebase listeners
   useEffect(() => {
@@ -440,96 +485,128 @@ export const BoardProvider: React.FC<{
   );
 
   // Undo/Redo operations
-const undo = useCallback(async () => {
-  if (undoStack.length === 0 || !boardId) return;
+  const undo = useCallback(async () => {
+    if (undoStack.length === 0 || !boardId) return;
 
-  const lastOperation = undoStack[undoStack.length - 1];
-  isUndoRedoOperation.current = true;
+    const lastOperation = undoStack[undoStack.length - 1];
+    isUndoRedoOperation.current = true;
 
-  try {
-    switch (lastOperation.type) {
-      case "CREATE_NOTE":
-        await remove(ref(database, `boards/${boardId}/notes/${lastOperation.data.id}`));
-        break;
+    try {
+      switch (lastOperation.type) {
+        case "CREATE_NOTE":
+          await remove(
+            ref(database, `boards/${boardId}/notes/${lastOperation.data.id}`)
+          );
+          break;
 
-      case "CREATE_SHAPE":
-        await remove(ref(database, `boards/${boardId}/shapes/${lastOperation.data.id}`));
-        break;
+        case "CREATE_SHAPE":
+          await remove(
+            ref(database, `boards/${boardId}/shapes/${lastOperation.data.id}`)
+          );
+          break;
 
-      case "UPDATE_NOTE":
-        await update(ref(database, `boards/${boardId}/notes/${lastOperation.id}`), lastOperation.oldData);
-        break;
+        case "UPDATE_NOTE":
+          await update(
+            ref(database, `boards/${boardId}/notes/${lastOperation.id}`),
+            lastOperation.oldData
+          );
+          break;
 
-      case "UPDATE_SHAPE":
-        await update(ref(database, `boards/${boardId}/shapes/${lastOperation.id}`), lastOperation.oldData);
-        break;
+        case "UPDATE_SHAPE":
+          await update(
+            ref(database, `boards/${boardId}/shapes/${lastOperation.id}`),
+            lastOperation.oldData
+          );
+          break;
 
-      case "DELETE_NOTE":
-        await set(ref(database, `boards/${boardId}/notes/${lastOperation.data.id}`), lastOperation.data);
-        break;
+        case "DELETE_NOTE":
+          await set(
+            ref(database, `boards/${boardId}/notes/${lastOperation.data.id}`),
+            lastOperation.data
+          );
+          break;
 
-      case "DELETE_SHAPE":
-        await set(ref(database, `boards/${boardId}/shapes/${lastOperation.data.id}`), lastOperation.data);
-        break;
+        case "DELETE_SHAPE":
+          await set(
+            ref(database, `boards/${boardId}/shapes/${lastOperation.data.id}`),
+            lastOperation.data
+          );
+          break;
+      }
+
+      setUndoStack((prev) => prev.slice(0, -1)); // Remove last item
+      setRedoStack((prev) => [lastOperation, ...prev]); // Add to redo stack
+    } catch (error) {
+      console.error("Error during undo:", error);
+    } finally {
+      setTimeout(() => {
+        isUndoRedoOperation.current = false;
+      }, 100);
     }
-
-    setUndoStack((prev) => prev.slice(0, -1)); // Remove last item
-    setRedoStack((prev) => [lastOperation, ...prev]); // Add to redo stack
-  } catch (error) {
-    console.error("Error during undo:", error);
-  } finally {
-    setTimeout(() => {
-      isUndoRedoOperation.current = false;
-    }, 100);
-  }
-}, [undoStack, boardId]);
-
-
+  }, [undoStack, boardId]);
 
   const redo = useCallback(async () => {
-  if (redoStack.length === 0 || !boardId) return;
+    if (redoStack.length === 0 || !boardId) return;
 
-  const operationToRedo = redoStack[0];
-  isUndoRedoOperation.current = true;
+    const operationToRedo = redoStack[0];
+    isUndoRedoOperation.current = true;
 
-  try {
-    switch (operationToRedo.type) {
-      case "CREATE_NOTE":
-        await set(ref(database, `boards/${boardId}/notes/${operationToRedo.data.id}`), operationToRedo.data);
-        break;
+    try {
+      switch (operationToRedo.type) {
+        case "CREATE_NOTE":
+          await set(
+            ref(database, `boards/${boardId}/notes/${operationToRedo.data.id}`),
+            operationToRedo.data
+          );
+          break;
 
-      case "CREATE_SHAPE":
-        await set(ref(database, `boards/${boardId}/shapes/${operationToRedo.data.id}`), operationToRedo.data);
-        break;
+        case "CREATE_SHAPE":
+          await set(
+            ref(
+              database,
+              `boards/${boardId}/shapes/${operationToRedo.data.id}`
+            ),
+            operationToRedo.data
+          );
+          break;
 
-      case "UPDATE_NOTE":
-        await update(ref(database, `boards/${boardId}/notes/${operationToRedo.id}`), operationToRedo.newData);
-        break;
+        case "UPDATE_NOTE":
+          await update(
+            ref(database, `boards/${boardId}/notes/${operationToRedo.id}`),
+            operationToRedo.newData
+          );
+          break;
 
-      case "UPDATE_SHAPE":
-        await update(ref(database, `boards/${boardId}/shapes/${operationToRedo.id}`), operationToRedo.newData);
-        break;
+        case "UPDATE_SHAPE":
+          await update(
+            ref(database, `boards/${boardId}/shapes/${operationToRedo.id}`),
+            operationToRedo.newData
+          );
+          break;
 
-      case "DELETE_NOTE":
-        await remove(ref(database, `boards/${boardId}/notes/${operationToRedo.data.id}`));
-        break;
+        case "DELETE_NOTE":
+          await remove(
+            ref(database, `boards/${boardId}/notes/${operationToRedo.data.id}`)
+          );
+          break;
 
-      case "DELETE_SHAPE":
-        await remove(ref(database, `boards/${boardId}/shapes/${operationToRedo.data.id}`));
-        break;
+        case "DELETE_SHAPE":
+          await remove(
+            ref(database, `boards/${boardId}/shapes/${operationToRedo.data.id}`)
+          );
+          break;
+      }
+
+      setRedoStack((prev) => prev.slice(1)); // Remove from redo
+      setUndoStack((prev) => [...prev, operationToRedo]); // Add back to undo
+    } catch (error) {
+      console.error("Error during redo:", error);
+    } finally {
+      setTimeout(() => {
+        isUndoRedoOperation.current = false;
+      }, 100);
     }
-
-    setRedoStack((prev) => prev.slice(1)); // Remove from redo
-    setUndoStack((prev) => [...prev, operationToRedo]); // Add back to undo
-  } catch (error) {
-    console.error("Error during redo:", error);
-  } finally {
-    setTimeout(() => {
-      isUndoRedoOperation.current = false;
-    }, 100);
-  }
-}, [redoStack, boardId]);
-
+  }, [redoStack, boardId]);
 
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
@@ -547,6 +624,8 @@ const undo = useCallback(async () => {
         shapes,
         userNames,
         createNote,
+        cursors,
+        trackCursor,
         createShape,
         updateNote,
         updateShape,

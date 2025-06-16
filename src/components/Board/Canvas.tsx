@@ -3,6 +3,8 @@ import Note from "./Note";
 import Shape from "./Shape";
 import { useAuth } from "../../context/AuthContext";
 import { useBoard } from "../../context/BoardContext";
+import { database } from "../../firebase/firebaseConfig";
+import { ref, set } from "firebase/database";
 
 interface CanvasProps {
   boardId: string;
@@ -18,6 +20,8 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
     userNames,
     createNote,
     createShape,
+    cursors,
+    trackCursor,
     updateNote,
     updateShape,
     deleteNote,
@@ -27,24 +31,48 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  // cursor pointer indicator
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
 
- useEffect(() => {
-  const container = scrollContainerRef.current;
-  if (!container) return;
+      const rect = container.getBoundingClientRect();
+      const scrollX = container.scrollLeft;
+      const scrollY = container.scrollTop;
 
-  const handleWheel = (e: WheelEvent) => {
-    if (e.ctrlKey) {
-      e.preventDefault(); // Prevent zoom scroll
-    }
-  };
+      const x = (e.clientX - rect.left + scrollX) / scale;
+      const y = (e.clientY - rect.top + scrollY) / scale;
 
-  container.addEventListener("wheel", handleWheel, { passive: false });
+      trackCursor(x, y);
+    };
 
-  return () => {
-    container.removeEventListener("wheel", handleWheel);
-  };
-}, []);
+    window.addEventListener("mousemove", handleMouseMove);
 
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      if (user && boardId) {
+        set(ref(database, `boards/${boardId}/cursors/${user.uid}`), null);
+      }
+    };
+  }, [trackCursor, scale, boardId, user]);
+
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault(); // Prevent zoom scroll
+      }
+    };
+
+    container.addEventListener("wheel", handleWheel, { passive: false });
+
+    return () => {
+      container.removeEventListener("wheel", handleWheel);
+    };
+  }, []);
 
   const handleWheel = (e: React.WheelEvent) => {
     if (e.ctrlKey) {
@@ -147,7 +175,9 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
             userNames={userNames}
             onSelect={(id) => setSelectedId(id)}
             onDragStop={(id, x, y) => handleNoteUpdate(id, { x, y })}
-            onResize={(id, w, h) => handleNoteUpdate(id, { width: w, height: h })}
+            onResize={(id, w, h) =>
+              handleNoteUpdate(id, { width: w, height: h })
+            }
             onDelete={handleDeleteNote}
             onTextChange={(id, text) => handleNoteUpdate(id, { text })}
           />
@@ -162,11 +192,53 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
             selected={selectedId === shape.id}
             onSelect={(id) => setSelectedId(id)}
             onMove={(id, x, y) => handleShapeUpdate(id, { x, y })}
-            onResize={(id, w, h) => handleShapeUpdate(id, { width: w, height: h })}
+            onResize={(id, w, h) =>
+              handleShapeUpdate(id, { width: w, height: h })
+            }
             onDelete={handleDeleteShape}
             onTextUpdate={(id, text) => handleShapeUpdate(id, { text })}
           />
         ))}
+        {Object.entries(cursors).map(([uid, cursor]) => {
+          if (uid === user?.uid) return null;
+          return (
+            <div
+              key={uid}
+              style={{
+                position: "absolute",
+                left: cursor.x * scale,
+                top: cursor.y * scale,
+                transform: "translate(-50%, -50%)",
+                pointerEvents: "none",
+                zIndex: 9999,
+              }}
+            >
+              <div
+                style={{
+                  width: 10,
+                  height: 10,
+                  backgroundColor: cursor.color || "#007bff",
+                  borderRadius: "50%",
+                  border: "2px solid white",
+                }}
+              />
+              <div
+                style={{
+                  fontSize: 12,
+                  color: "#333",
+                  background: "#fff",
+                  padding: "2px 4px",
+                  borderRadius: 4,
+                  marginTop: 2,
+                  textAlign: "center",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+                }}
+              >
+                {cursor.displayName || "User"}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
