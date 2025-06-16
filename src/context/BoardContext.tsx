@@ -87,13 +87,15 @@ trackCursor: (x: number, y: number) => void;
   canUndo: boolean;
   canRedo: boolean;
 }
-export type CursorData = {
+type CursorData = {
   x: number;
   y: number;
   displayName: string;
   color: string;
   lastActive: number;
 };
+
+
 
 const BoardContext = createContext<BoardContextType | undefined>(undefined);
 
@@ -116,6 +118,7 @@ export const BoardProvider: React.FC<{
   const [undoStack, setUndoStack] = useState<Operation[]>([]);
   const [redoStack, setRedoStack] = useState<Operation[]>([]);
   const [cursors, setCursors] = useState<{ [uid: string]: CursorData }>({});
+
 
 
   // Track if we're in the middle of an undo/redo operation
@@ -181,35 +184,53 @@ export const BoardProvider: React.FC<{
 
   // firebase liestner
 useEffect(() => {
-  const interval = setInterval(() => {
-    setCursors((prev) => {
-      const now = Date.now();
-      const filtered: typeof prev = {};
+  if (!boardId) return;
 
-      Object.entries(prev).forEach(([uid, data]) => {
-        if (now - data.lastActive < 30000) {
-          filtered[uid] = data;
+  const cursorsRef = ref(database, `boards/${boardId}/cursors`);
+  const unsubscribe = onValue(cursorsRef, (snapshot) => {
+    const raw = snapshot.val() || {};
+    const now = Date.now();
+
+    const filtered: { [uid: string]: CursorData } = {};
+    Object.entries(raw).forEach(([uid, data]) => {
+      // Type guard: check that data is an object and has expected fields
+      if (
+        typeof data === "object" &&
+        data !== null &&
+        "x" in data &&
+        "y" in data &&
+        "lastActive" in data &&
+        typeof (data as any).lastActive === "number"
+      ) {
+        const cursor = data as CursorData;
+
+        // Only include if active in last 30 seconds
+        if (now - cursor.lastActive < 30000) {
+          filtered[uid] = cursor;
         }
-      });
-
-      return filtered;
+      }
     });
-  }, 10000); // check every 10s
 
-  return () => clearInterval(interval);
-}, []);
+    setCursors(filtered);
+  });
 
+  return () => off(cursorsRef, "value", unsubscribe);
+}, [boardId]);
 
 const trackCursor = (x: number, y: number) => {
   if (!user || !boardId) return;
-  set(ref(database, `boards/${boardId}/cursors/${user.uid}`), {
+
+  const cursorRef = ref(database, `boards/${boardId}/cursors/${user.uid}`);
+  set(cursorRef, {
     x,
     y,
-    displayName: user.displayName || user.email,
+    displayName: user.displayName || user.email || "User",
     color: "#007bff",
     lastActive: Date.now(),
   });
 };
+
+
 
 
 

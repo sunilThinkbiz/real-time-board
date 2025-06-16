@@ -48,14 +48,8 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
     };
 
     window.addEventListener("mousemove", handleMouseMove);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      if (user && boardId) {
-        set(ref(database, `boards/${boardId}/cursors/${user.uid}`), null);
-      }
-    };
-  }, [trackCursor, scale, boardId, user]);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, [trackCursor, scale]);
 
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -199,15 +193,16 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
             onTextUpdate={(id, text) => handleShapeUpdate(id, { text })}
           />
         ))}
-        {Object.entries(cursors).map(([uid, cursor]) => {
+        {Object.entries(cursors).map(([uid, cursorData]) => {
           if (uid === user?.uid) return null;
+
           return (
             <div
               key={uid}
               style={{
                 position: "absolute",
-                left: cursor.x * scale,
-                top: cursor.y * scale,
+                left: cursorData.x * scale,
+                top: cursorData.y * scale,
                 transform: "translate(-50%, -50%)",
                 pointerEvents: "none",
                 zIndex: 9999,
@@ -217,7 +212,7 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
                 style={{
                   width: 10,
                   height: 10,
-                  backgroundColor: cursor.color || "#007bff",
+                  backgroundColor: cursorData.color || "#007bff",
                   borderRadius: "50%",
                   border: "2px solid white",
                 }}
@@ -234,7 +229,7 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
                   boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
                 }}
               >
-                {cursor.displayName || "User"}
+                {cursorData.displayName || "User"}
               </div>
             </div>
           );
