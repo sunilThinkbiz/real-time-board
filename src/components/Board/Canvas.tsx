@@ -1,21 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
-import { ref, onValue, set, push, remove, update } from "firebase/database";
-import { database } from "../../firebase/firebaseConfig";
+import React, { useState, useEffect, useRef } from "react";
 import Note from "./Note";
 import Shape from "./Shape";
 import { useAuth } from "../../context/AuthContext";
 import { useBoard } from "../../context/BoardContext";
-
-interface NoteData {
-  id: string;
-  text: string;
-  x: number;
-  y: number;
-  width?: number;
-  height?: number;
-  color?: string;
-  createdBy: string;
-}
 
 interface CanvasProps {
   boardId: string;
@@ -23,158 +10,164 @@ interface CanvasProps {
 
 const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
   const { user } = useAuth();
-  const { activeTool, setActiveTool, selectedColor } = useBoard();
+  const {
+    activeTool,
+    selectedColor,
+    notes,
+    shapes,
+    userNames,
+    createNote,
+    createShape,
+    updateNote,
+    updateShape,
+    deleteNote,
+    deleteShape,
+  } = useBoard();
 
-  const [notes, setNotes] = useState<NoteData[]>([]);
-  const [shapes, setShapes] = useState<Record<string, any>>({});
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [scale, setScale] = useState(1);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const canvasRef = useRef<HTMLDivElement>(null);
+ useEffect(() => {
+  const container = scrollContainerRef.current;
+  if (!container) return;
 
-  useEffect(() => {
-    const shapeRef = ref(database, `boards/${boardId}/shapes`);
-    return onValue(shapeRef, (snapshot) => {
-      setShapes(snapshot.val() || {});
-    });
-  }, [boardId]);
-
-  useEffect(() => {
-    const notesRef = ref(database, `boards/${boardId}/notes`);
-    return onValue(notesRef, (snapshot) => {
-      const data = snapshot.val();
-      const parsed: NoteData[] = data
-        ? Object.entries(data).map(([id, val]) => ({
-            ...(val as Omit<NoteData, "id">),
-            id,
-          }))
-        : [];
-      setNotes(parsed);
-    });
-  }, [boardId]);
-
-  const addNote = async (x: number, y: number) => {
-    const newNote = {
-      text: "",
-      x,
-      y,
-      width: 200,
-      height: 100,
-      color: selectedColor || "#ffc107",
-      createdBy: user?.displayName || "Unknown",
-    };
-    const noteRef = push(ref(database, `boards/${boardId}/notes`));
-    await set(noteRef, newNote);
+  const handleWheel = (e: WheelEvent) => {
+    if (e.ctrlKey) {
+      e.preventDefault(); // Prevent zoom scroll
+    }
   };
 
-  const updateNotePosition = (id: string, x: number, y: number) => {
-    const note = notes.find((n) => n.id === id);
-    if (!note) return;
-    set(ref(database, `boards/${boardId}/notes/${id}`), { ...note, x, y });
+  container.addEventListener("wheel", handleWheel, { passive: false });
+
+  return () => {
+    container.removeEventListener("wheel", handleWheel);
+  };
+}, []);
+
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.1 : 0.1;
+      setScale((prev) => Math.min(Math.max(prev + delta, 0.1), 4));
+    }
   };
 
-  const updateNoteSize = (id: string, width: number, height: number) => {
-    const note = notes.find((n) => n.id === id);
-    if (!note) return;
-    set(ref(database, `boards/${boardId}/notes/${id}`), {
-      ...note,
-      width,
-      height,
-    });
+  const handleCanvasClick = async (e: React.MouseEvent) => {
+    if (!activeTool || !user || !boardId) return;
+
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const scrollX = container.scrollLeft;
+    const scrollY = container.scrollTop;
+
+    const x = (e.clientX - rect.left + scrollX) / scale;
+    const y = (e.clientY - rect.top + scrollY) / scale;
+
+    try {
+      if (activeTool === "note") {
+        await createNote(x, y);
+      } else {
+        await createShape(activeTool, x, y);
+      }
+    } catch (error) {
+      console.error("Error creating element:", error);
+    }
   };
 
-  const updateNoteText = (id: string, text: string) => {
-    const note = notes.find((n) => n.id === id);
-    if (!note) return;
-    set(ref(database, `boards/${boardId}/notes/${id}`), { ...note, text });
+  const handleNoteUpdate = async (id: string, updates: Partial<any>) => {
+    try {
+      await updateNote(id, updates);
+    } catch (error) {
+      console.error("Error updating note:", error);
+    }
   };
 
-  const deleteNote = (id: string) => {
-    remove(ref(database, `boards/${boardId}/notes/${id}`));
+  const handleShapeUpdate = async (id: string, updates: Partial<any>) => {
+    try {
+      await updateShape(id, updates);
+    } catch (error) {
+      console.error("Error updating shape:", error);
+    }
   };
 
-  const handleMove = (id: string, x: number, y: number) => {
-    update(ref(database, `boards/${boardId}/shapes/${id}`), { x, y });
-  };
-
-  const handleResize = (id: string, width: number, height: number) => {
-    update(ref(database, `boards/${boardId}/shapes/${id}`), { width, height });
-  };
-
-  const handleTextUpdate = (id: string, text: string) => {
-    update(ref(database, `boards/${boardId}/shapes/${id}`), { text });
-  };
-
-  const handleDelete = (id: string) => {
-    remove(ref(database, `boards/${boardId}/shapes/${id}`));
-  };
-
-  const handleCanvasClick = (
-    e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>
-  ) => {
-    if (activeTool !== "note") {
+  const handleDeleteNote = async (id: string) => {
+    try {
+      await deleteNote(id);
       setSelectedId(null);
-      return;
+    } catch (error) {
+      console.error("Error deleting note:", error);
     }
+  };
 
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    let clientX = 0;
-    let clientY = 0;
-
-    if ("changedTouches" in e && e.changedTouches.length > 0) {
-      clientX = e.changedTouches[0].clientX;
-      clientY = e.changedTouches[0].clientY;
-    } else if ("clientX" in e) {
-      clientX = e.clientX;
-      clientY = e.clientY;
+  const handleDeleteShape = async (id: string) => {
+    try {
+      await deleteShape(id);
+      setSelectedId(null);
+    } catch (error) {
+      console.error("Error deleting shape:", error);
     }
-
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
-    addNote(x, y);
-    setActiveTool(null);
   };
 
   return (
     <div
-      ref={canvasRef}
+      ref={scrollContainerRef}
       onClick={handleCanvasClick}
-      onTouchEnd={(e) => {
-        e.preventDefault();
-        handleCanvasClick(e);
+      onWheel={handleWheel}
+      style={{
+        width: "100%",
+        height: "100%",
+        overflow: "auto",
+        background: "#f5f5f5",
+        position: "relative",
       }}
-      className="board-background"
-      style={{ width: "100%", height: "100%", position: "relative" }}
     >
-      {Object.entries(shapes).map(([id, shape]) => (
-        <Shape
-          key={id}
-          {...shape}
-          currentUser={user?.uid}
-          onMove={handleMove}
-          onResize={handleResize}
-          onDelete={handleDelete}
-          onTextUpdate={handleTextUpdate}
-          selected={selectedId === id}
-          onSelect={setSelectedId}
-        />
-      ))}
+      <div
+        style={{
+          width: 3000,
+          height: 3000,
+          transform: `scale(${scale})`,
+          transformOrigin: "0 0",
+          backgroundImage:
+            "linear-gradient(0deg, #e0e0e0 1px, transparent 1px), linear-gradient(90deg, #e0e0e0 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+          position: "relative",
+        }}
+      >
+        {notes.map((note) => (
+          <Note
+            key={note.id}
+            {...note}
+            scale={scale}
+            currentUser={user?.uid || ""}
+            selected={selectedId === note.id}
+            userNames={userNames}
+            onSelect={(id) => setSelectedId(id)}
+            onDragStop={(id, x, y) => handleNoteUpdate(id, { x, y })}
+            onResize={(id, w, h) => handleNoteUpdate(id, { width: w, height: h })}
+            onDelete={handleDeleteNote}
+            onTextChange={(id, text) => handleNoteUpdate(id, { text })}
+          />
+        ))}
 
-      {notes.map((note) => (
-        <Note
-          key={note.id}
-          {...note}
-          currentUser={user?.displayName || ""}
-          selected={selectedId === note.id}
-          onSelect={setSelectedId}
-          onDragStop={updateNotePosition}
-          onDelete={deleteNote}
-          onTextChange={updateNoteText}
-          onResize={updateNoteSize}
-        />
-      ))}
+        {shapes.map((shape) => (
+          <Shape
+            key={shape.id}
+            {...shape}
+            scale={scale}
+            currentUser={user?.uid || ""}
+            selected={selectedId === shape.id}
+            onSelect={(id) => setSelectedId(id)}
+            onMove={(id, x, y) => handleShapeUpdate(id, { x, y })}
+            onResize={(id, w, h) => handleShapeUpdate(id, { width: w, height: h })}
+            onDelete={handleDeleteShape}
+            onTextUpdate={(id, text) => handleShapeUpdate(id, { text })}
+          />
+        ))}
+      </div>
     </div>
   );
 };

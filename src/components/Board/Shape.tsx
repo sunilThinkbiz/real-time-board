@@ -12,6 +12,7 @@ interface ShapeProps {
   color: string;
   rotation?: number;
   text?: string;
+  scale?:number;
   createdBy: string;
   currentUser: string;
   onMove: (id: string, x: number, y: number) => void;
@@ -39,6 +40,7 @@ const Shape: React.FC<ShapeProps> = ({
   text = "",
   createdBy,
   currentUser,
+  scale,
   onMove,
   onResize,
   onDelete,
@@ -46,8 +48,6 @@ const Shape: React.FC<ShapeProps> = ({
   selected,
   onSelect,
 }) => {
-  const isEditable = createdBy === currentUser;
-
   const renderShapeContent = () => {
     const baseStyle: React.CSSProperties = {
       width: "100%",
@@ -56,6 +56,7 @@ const Shape: React.FC<ShapeProps> = ({
       display: "flex",
       justifyContent: "center",
       alignItems: "center",
+      wordBreak:"break-word",
       position: "relative",
       padding: 4,
       textAlign: "center",
@@ -88,13 +89,13 @@ const Shape: React.FC<ShapeProps> = ({
       case "rectangle":
         return (
           <div style={{ ...baseStyle, borderRadius: 4 }}>
-            {isEditable && selected ? editableText : staticText}
+            {selected ? editableText : staticText}
           </div>
         );
       case "circle":
         return (
-          <div style={{ ...baseStyle, borderRadius: "50%" }}>
-            {isEditable && selected ? editableText : staticText}
+          <div style={{ ...baseStyle, borderRadius: "50%",}}>
+            {selected ? editableText : staticText}
           </div>
         );
       case "line":
@@ -119,8 +120,9 @@ const Shape: React.FC<ShapeProps> = ({
     <Rnd
       size={{ width, height }}
       position={{ x, y }}
-      disableDragging={!isEditable}
-      enableResizing={isEditable}
+      disableDragging={false}
+      scale={scale}
+      enableResizing={true}
       onDragStop={(e, d) => onMove(id, d.x, d.y)}
       onResizeStop={(e, direction, ref, delta, position) => {
         onResize(id, ref.offsetWidth, ref.offsetHeight, rotation);
@@ -139,7 +141,7 @@ const Shape: React.FC<ShapeProps> = ({
       <div style={{ width: "100%", height: "100%", position: "relative" }}>
         {renderShapeContent()}
 
-        {isEditable && selected && (
+        {selected && (
           <FaTimes
             onClick={() => onDelete(id)}
             style={{

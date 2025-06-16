@@ -1,31 +1,66 @@
+body {
+  overflow-y: hidden;   /* ⛔️ disables global page scroll */
+  overflow-x: hidden;
+}
+
+html {
+  overflow-y: hidden;   /* sometimes needed for cross-browser */
+}
+.sidebar {
+  height: 100vh;
+  width: 80px;
+  border-right: 1px solid #ddd;
+  border-radius: 20px !important;
+  position: sticky;
+  top: 0;
+  display: flex;             
+  flex-direction: column;
+  align-items: center;
+  padding: 20px 0;
+  overflow-y: auto;          
+  overflow-x: hidden;
+}
+
+
 .sidebar-icon-btn {
-  width: 40px;
-  height: 40px;
-  border: 1px solid #ccc;
-  border-radius: 50%;
-  background-color: white;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 12px;
+  margin-bottom: 16px;    /* ✅ Consistent space */
+  background: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color 0.2s ease-in-out;
+  transition: all 0.2s;
+  box-shadow: 0 0 2px rgba(0,0,0,0.1);
+}
+
+.color-palette {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
 .sidebar-icon-btn:hover {
   background-color: #e0f0ff;
 }
 
-.sidebar-icon-btn.active {
-  background-color: #007bff;
-  color: white;
+.sidebar-icon-btn:focus {
+  outline: none;
 }
-.board-background{
-  position: relative;
-  height: 100vh;
-  overflow: auto;
-  touch-action: manipulation;
-  background-color: #f9f9f9;
-  background-image: 
-    linear-gradient(to right, #e0e0e0 1px, transparent 1px),
-    linear-gradient(to bottom, #e0e0e0 1px, transparent 1px);
-  background-size: 40px 40px; /* size of each cell */
+
+
+.color-circle {
+  width: 28px;
+  height: 28px;
+  border: 2px solid #ddd;
+  border-radius: 50%;
+  margin-bottom: 10px;
+  cursor: pointer;
+}
+
+.color-circle.selected {
+  border: 3px solid #000;
 }

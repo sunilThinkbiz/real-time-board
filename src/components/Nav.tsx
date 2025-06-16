@@ -23,7 +23,10 @@ const Navbar: React.FC<NavbarProps> = ({ onLogout }) => {
   const onlineUsers = userList.filter((u: any) => u.online);
 
   return (
-    <BootstrapNavbar bg="light" expand="lg" className="shadow-sm">
+    <BootstrapNavbar bg="light"
+  expand="lg"
+  className="shadow-sm"
+  style={{ position: "sticky", top: 0, zIndex: 1000 }}>
       <Container fluid>
         <BootstrapNavbar.Brand className="fw-bold fs-4">
           {NAVBAR.NAVBAR_TITLE}
