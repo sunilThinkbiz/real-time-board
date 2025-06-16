@@ -1,20 +1,18 @@
-
 import React from "react";
-import { signOut } from "firebase/auth";
-import { auth } from "../firebase/firebaseConfig";
 import Navbar from "../components/Nav";
 import Sidebar from "../components/Board/Sidebar";
 import Canvas from "../components/Board/Canvas";
-// import { Container, Row, Col } from "react-bootstrap";
 import { BoardProvider } from "../context/BoardContext";
 import { useParams, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { usePresence } from "../hook/usePresence";
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase/firebaseConfig";
 
 const Home: React.FC = () => {
   const { user, loading } = useAuth();
   const { boardId } = useParams<{ boardId: string }>();
-  const resolvedBoardId = boardId || user?.uid || null;
+  const resolvedBoardId = boardId || user?.uid || "";
 
   usePresence(resolvedBoardId);
 
@@ -25,21 +23,33 @@ const Home: React.FC = () => {
   if (!boardId) return <Navigate to={`/board/${user.uid}`} />;
 
   return (
-  <BoardProvider>
-    <div style={{ height: "100vh", display: "flex", flexDirection: "column" }}>
-      <Navbar onLogout={handleLogout} />
-      <div style={{ flex: 1, display: "flex" }}>
-        <div style={{ width: "80px", backgroundColor: "#f8f9fa", borderRight: "1px solid #ddd" }}>
-          <Sidebar />
-        </div>
-        <div style={{ flex: 1 }}>
-          <Canvas boardId={boardId} />
+    <BoardProvider boardId={resolvedBoardId}>
+      <div
+        style={{ height: "100vh", display: "flex", flexDirection: "column" }}
+      >
+        {/* Fixed Navbar at top */}
+        <Navbar onLogout={handleLogout} />
+
+        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+          {/* Fixed Sidebar on left */}
+          <div
+            style={{
+              width: "80px",
+              background: "#f8f9fa",
+              borderRight: "1px solid #ddd",
+            }}
+          >
+            <Sidebar />
+          </div>
+
+          {/* Canvas area */}
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            <Canvas boardId={resolvedBoardId} />
+          </div>
         </div>
       </div>
-    </div>
-  </BoardProvider>
-);
-
+    </BoardProvider>
+  );
 };
 
 export default Home;
