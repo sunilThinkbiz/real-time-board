@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { database } from "../firebase/firebaseConfig";
+import { database, auth } from "../firebase/firebaseConfig";
 import { ref, onValue, push, remove, update, set } from "firebase/database";
-import { auth } from "../firebase/firebaseConfig"; 
 
 interface Note {
   id: string;
@@ -18,10 +17,11 @@ export const useBoardData = (boardId: string) => {
   const [notes, setNotes] = useState<Record<string, Note>>({});
 
   useEffect(() => {
+    if (!boardId) return;
+
     const notesRef = ref(database, `boards/${boardId}/notes`);
     const unsubscribe = onValue(notesRef, (snapshot) => {
-      const data = snapshot.val() || {};
-      setNotes(data);
+      setNotes(snapshot.val() || {});
     });
 
     return () => unsubscribe();
@@ -36,7 +36,7 @@ export const useBoardData = (boardId: string) => {
 
     await set(newNoteRef, {
       ...noteData,
-      createdBy: uid, //  required by Firebase rules
+      createdBy: uid,
     });
   };
 

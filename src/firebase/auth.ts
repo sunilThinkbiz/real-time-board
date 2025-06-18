@@ -1,7 +1,7 @@
 
 import { auth, database } from "./firebaseConfig";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
-import { ref, get, set } from "firebase/database";
+import { ref, get, set, update, remove, onDisconnect } from "firebase/database";
 
 const provider = new GoogleAuthProvider();
 
@@ -19,19 +19,26 @@ export const signInWithGoogle = async () => {
   } else {
     boardId = snapshot.val(); // All others join
   }
-
+const userRef = ref(database, `boards/${boardId}/users/${user.uid}`);
   // Add user under the board
-  await set(ref(database, `boards/${boardId}/users/${user.uid}`), {
+  await set(userRef, {
     uid: user.uid,
     displayName: user.displayName || "",
     email: user.email || "",
     photoURL: user.photoURL || "",
     online: true
   });
-
+onDisconnect(userRef).update({
+    online: false,
+    lastActive: Date.now()
+  });
   return { result, boardId };
 };
 
-export const logOut = async () => {
+export const logOut = async (boardId?: string, uid?: string) => {
+  if (boardId && uid) {
+    const userRef = ref(database, `boards/${boardId}/users/${uid}`);
+    await update(userRef, { online: false });
+  }
   await signOut(auth);
 };
