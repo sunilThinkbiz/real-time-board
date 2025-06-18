@@ -14,6 +14,7 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
   const { user } = useAuth();
   const {
     activeTool,
+    setActiveTool,
     selectedColor,
     notes,
     shapes,
@@ -77,6 +78,7 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
   };
 
   const handleCanvasClick = async (e: React.MouseEvent) => {
+    setSelectedId(null);
     if (!activeTool || !user || !boardId) return;
 
     const container = scrollContainerRef.current;
@@ -88,12 +90,14 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
 
     const x = (e.clientX - rect.left + scrollX) / scale;
     const y = (e.clientY - rect.top + scrollY) / scale;
-
+     setActiveTool(null)
     try {
       if (activeTool === "note") {
         await createNote(x, y);
+       
       } else {
         await createShape(activeTool, x, y);
+        
       }
     } catch (error) {
       console.error("Error creating element:", error);
@@ -145,6 +149,7 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
         overflow: "auto",
         background: "#f5f5f5",
         position: "relative",
+        cursor:"grab"
       }}
     >
       <div
