@@ -36,7 +36,7 @@ const Home: React.FC = () => {
         style={{ height: "100vh", display: "flex", flexDirection: "column" }}
       >
         {/* Fixed Navbar at top */}
-        <Navbar onLogout={handleLogout}/>
+        <Navbar onLogout={handleLogout} onInvite={handleInvite} />
 
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
           {/* Fixed Sidebar on left */}
@@ -53,7 +53,7 @@ const Home: React.FC = () => {
           {/* Canvas area */}
           <div style={{ flex: 1, overflow: "hidden" }}>
 
-            <Canvas boardId={resolvedBoardId} onInvite={handleInvite} />
+            <Canvas boardId={resolvedBoardId} />
           </div>
         </div>
       </div>
