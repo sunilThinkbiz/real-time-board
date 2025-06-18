@@ -17,7 +17,15 @@ const Home: React.FC = () => {
   usePresence(resolvedBoardId);
 
   const handleLogout = () => signOut(auth);
-
+ const handleInvite = async () => {
+    const link = `${window.location.origin}/board/${resolvedBoardId}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      alert("Board link copied to clipboard!");
+    } catch (err) {
+      console.error("Failed to copy: ", err);
+    }
+  };
   if (loading) return <div>Loading...</div>;
   if (!user) return <Navigate to="/login" />;
   if (!boardId) return <Navigate to={`/board/${user.uid}`} />;
@@ -28,7 +36,7 @@ const Home: React.FC = () => {
         style={{ height: "100vh", display: "flex", flexDirection: "column" }}
       >
         {/* Fixed Navbar at top */}
-        <Navbar onLogout={handleLogout} />
+        <Navbar onLogout={handleLogout}/>
 
         <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
           {/* Fixed Sidebar on left */}
@@ -44,7 +52,8 @@ const Home: React.FC = () => {
 
           {/* Canvas area */}
           <div style={{ flex: 1, overflow: "hidden" }}>
-            <Canvas boardId={resolvedBoardId} />
+
+            <Canvas boardId={resolvedBoardId} onInvite={handleInvite} />
           </div>
         </div>
       </div>
