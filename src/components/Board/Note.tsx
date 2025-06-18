@@ -72,110 +72,126 @@ const Note: React.FC<NoteProps> = ({
       }}
       style={{ zIndex: selected ? 1000 : 1 }}
     >
+      {/* Outer wrapper for spacing and glow */}
       <div
         style={{
           width: "100%",
           height: "100%",
-          backgroundColor: color,
-          border: selected ? "3px solid #007bff" : "2px solid rgba(0,0,0,0.1)",
-          borderRadius: "12px",
+          padding: "6px",
+          border: selected ? "2px solid #007bff" : "2px solid transparent",
+          // borderRadius: "16px",
           boxShadow: selected
-            ? "0 8px 25px rgba(0,123,255,0.3)"
-            : "0 4px 12px rgba(0,0,0,0.15)",
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          transition: "all 0.2s ease",
-          cursor: "move",
-          position: "relative",
+            ? "0 0 10px rgba(0,123,255,0.6)"
+            : "0 2px 8px rgba(0,0,0,0.05)",
+          background: "transparent",
+          boxSizing: "border-box",
         }}
       >
+        {/* Inner note card */}
         <div
           style={{
-            padding: "8px 12px",
-            backgroundColor: "rgba(0,0,0,0.05)",
-            borderBottom: "1px solid rgba(0,0,0,0.1)",
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            minHeight: "32px",
-          }}
-        >
-          <small
-            style={{
-              fontSize: "11px",
-              color: "#666",
-              fontWeight: "500",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              maxWidth: "calc(100% - 30px)",
-            }}
-          >
-            {getOwnerDisplayName()}
-          </small>
-          <Button
-            variant="outline-danger"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onDelete(id);
-            }}
-            style={{
-              padding: "2px 6px",
-              fontSize: "12px",
-              lineHeight: "1",
-              border: "none",
-              backgroundColor: "transparent",
-              color: "#dc3545",
-              minWidth: "20px",
-              height: "20px",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = "#dc3545";
-              e.currentTarget.style.color = "white";
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = "transparent";
-              e.currentTarget.style.color = "#dc3545";
-            }}
-          >
-            ×
-          </Button>
-        </div>
-
-        <div
-          style={{
-            flex: 1,
-            padding: "12px",
+            width: "100%",
+            height: "100%",
+            backgroundColor: color,
+            // borderRadius: "12px",
+            
+            boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
             display: "flex",
             flexDirection: "column",
+            overflow: "hidden",
+            cursor: "move",
+            boxSizing: "border-box",
           }}
         >
-          <textarea
-            value={editText}
-            onChange={(e) => {
-              const newText = e.target.value;
-              setEditText(newText);
-              onTextChange(id, newText);
-            }}
-            placeholder="Type your note here..."
+          {/* Header with owner and delete */}
+          <div
             style={{
-              width: "100%",
-              height: "100%",
-              resize: "none",
-              background: "transparent",
-              border: "none",
-              outline: "none",
-              fontSize: "13px",
-              lineHeight: "1.4",
-              fontFamily:
-                "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-              color: "#333",
-              cursor: "text",
-              padding: "0",
+              padding: "6px 10px",
+              backgroundColor: "rgba(0,0,0,0.05)",
+              borderBottom: "1px solid rgba(0,0,0,0.1)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              minHeight: "28px",
             }}
-          />
+          >
+            <small
+              style={{
+                fontSize: "11px",
+                color: "#444",
+                fontWeight: "500",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                maxWidth: "calc(100% - 30px)",
+              }}
+            >
+              {getOwnerDisplayName()}
+            </small>
+            <Button
+              variant="outline-danger"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(id);
+              }}
+              style={{
+                padding: "2px 6px",
+                fontSize: "12px",
+                lineHeight: "1",
+                border: "none",
+                backgroundColor: "transparent",
+                color: "#dc3545",
+                minWidth: "20px",
+                height: "20px",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = "#dc3545";
+                e.currentTarget.style.color = "white";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = "transparent";
+                e.currentTarget.style.color = "#dc3545";
+              }}
+            >
+              ×
+            </Button>
+          </div>
+
+          {/* Text area body */}
+          <div
+            style={{
+              flex: 1,
+              padding: "10px",
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
+            <textarea
+              value={editText}
+              onChange={(e) => {
+                const newText = e.target.value;
+                setEditText(newText);
+                onTextChange(id, newText);
+              }}
+              placeholder="Type your note here..."
+              style={{
+                width: "100%",
+                height: "100%",
+                resize: "none",
+                background: "transparent",
+                border: "none",
+                outline: "none",
+                fontSize: "13px",
+                lineHeight: "1.4",
+                fontFamily:
+                  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                color: "#333",
+                cursor: "text",
+                padding: "0",
+              }}
+            />
+          </div>
         </div>
       </div>
     </Rnd>

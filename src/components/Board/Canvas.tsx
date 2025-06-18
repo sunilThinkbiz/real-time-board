@@ -8,13 +8,13 @@ import { ref, set } from "firebase/database";
 
 interface CanvasProps {
   boardId: string;
-  onInvite: () => void; 
 }
 
-const Canvas: React.FC<CanvasProps> = ({ boardId,onInvite }) => {
+const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
   const { user } = useAuth();
   const {
     activeTool,
+    setActiveTool,
     selectedColor,
     notes,
     shapes,
@@ -78,6 +78,7 @@ const Canvas: React.FC<CanvasProps> = ({ boardId,onInvite }) => {
   };
 
   const handleCanvasClick = async (e: React.MouseEvent) => {
+    setSelectedId(null);
     if (!activeTool || !user || !boardId) return;
 
     const container = scrollContainerRef.current;
@@ -89,12 +90,14 @@ const Canvas: React.FC<CanvasProps> = ({ boardId,onInvite }) => {
 
     const x = (e.clientX - rect.left + scrollX) / scale;
     const y = (e.clientY - rect.top + scrollY) / scale;
-
+     setActiveTool(null)
     try {
       if (activeTool === "note") {
         await createNote(x, y);
+       
       } else {
         await createShape(activeTool, x, y);
+        
       }
     } catch (error) {
       console.error("Error creating element:", error);
@@ -146,27 +149,9 @@ const Canvas: React.FC<CanvasProps> = ({ boardId,onInvite }) => {
         overflow: "auto",
         background: "#f5f5f5",
         position: "relative",
+        cursor:"grab"
       }}
     >
-      <button
-      onClick={onInvite}
-      style={{
-        position: "fixed",
-        top: "15%",             // vertically centered
-        right: "50px",          // distance from right edge
-        transform: "translateY(-50%)", // adjust for perfect centering
-        padding: "10px 20px",
-        backgroundColor: "#007bff",
-        color: "#fff",
-        border: "none",
-        borderRadius: "4px",
-        cursor: "pointer",
-        boxShadow: "0 2px 6px rgba(0,0,0,0.2)",
-        zIndex: 2000,           // stay on top of canvas
-      }}
-    >
-      Share Board
-    </button>
       <div
         style={{
           width: 3000,
