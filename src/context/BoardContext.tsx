@@ -66,8 +66,8 @@ interface BoardContextType {
 
   selectedElementId: string | null;
   setSelectedElementId: (id: string | null) => void;
-cursors: Record<string, any>;
-trackCursor: (x: number, y: number) => void;
+  cursors: Record<string, any>;
+  trackCursor: (x: number, y: number) => void;
   notes: NoteType[];
   shapes: ShapeType[];
 
@@ -183,52 +183,52 @@ export const BoardProvider: React.FC<{
   );
 
   // firebase liestner
-useEffect(() => {
-  if (!boardId) return;
+  useEffect(() => {
+    if (!boardId) return;
 
-  const cursorsRef = ref(database, `boards/${boardId}/cursors`);
-  const unsubscribe = onValue(cursorsRef, (snapshot) => {
-    const raw = snapshot.val() || {};
-    const now = Date.now();
+    const cursorsRef = ref(database, `boards/${boardId}/cursors`);
+    const unsubscribe = onValue(cursorsRef, (snapshot) => {
+      const raw = snapshot.val() || {};
+      const now = Date.now();
 
-    const filtered: { [uid: string]: CursorData } = {};
-    Object.entries(raw).forEach(([uid, data]) => {
-      // Type guard: check that data is an object and has expected fields
-      if (
-        typeof data === "object" &&
-        data !== null &&
-        "x" in data &&
-        "y" in data &&
-        "lastActive" in data &&
-        typeof (data as any).lastActive === "number"
-      ) {
-        const cursor = data as CursorData;
+      const filtered: { [uid: string]: CursorData } = {};
+      Object.entries(raw).forEach(([uid, data]) => {
+        // Type guard: check that data is an object and has expected fields
+        if (
+          typeof data === "object" &&
+          data !== null &&
+          "x" in data &&
+          "y" in data &&
+          "lastActive" in data &&
+          typeof (data as any).lastActive === "number"
+        ) {
+          const cursor = data as CursorData;
 
-        // Only include if active in last 30 seconds
-        if (now - cursor.lastActive < 30000) {
-          filtered[uid] = cursor;
+          // Only include if active in last 30 seconds
+          if (now - cursor.lastActive < 30000) {
+            filtered[uid] = cursor;
+          }
         }
-      }
+      });
+
+      setCursors(filtered);
     });
 
-    setCursors(filtered);
-  });
+    return () => off(cursorsRef, "value", unsubscribe);
+  }, [boardId]);
 
-  return () => off(cursorsRef, "value", unsubscribe);
-}, [boardId]);
+  const trackCursor = (x: number, y: number) => {
+    if (!user || !boardId) return;
 
-const trackCursor = (x: number, y: number) => {
-  if (!user || !boardId) return;
-
-  const cursorRef = ref(database, `boards/${boardId}/cursors/${user.uid}`);
-  set(cursorRef, {
-    x,
-    y,
-    displayName: user.displayName || user.email || "User",
-    color: "#007bff",
-    lastActive: Date.now(),
-  });
-};
+    const cursorRef = ref(database, `boards/${boardId}/cursors/${user.uid}`);
+    set(cursorRef, {
+      x,
+      y,
+      displayName: user.displayName || user.email || "User",
+      color: "#007bff",
+      lastActive: Date.now(),
+    });
+  };
 
 
 
@@ -566,6 +566,21 @@ const trackCursor = (x: number, y: number) => {
     }
   }, [undoStack, boardId]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Z
+      if ((e.ctrlKey || e.metaKey) && e.key === "z") {
+        e.preventDefault();
+        undo();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [undo]);
+
   const redo = useCallback(async () => {
     if (redoStack.length === 0 || !boardId) return;
 
@@ -628,7 +643,20 @@ const trackCursor = (x: number, y: number) => {
       }, 100);
     }
   }, [redoStack, boardId]);
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Z
+      if ((e.ctrlKey || e.metaKey) && e.key === "y") {
+        e.preventDefault();
+        redo();
+      }
+    };
 
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [redo]);
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
 
