@@ -11,6 +11,7 @@ import {
   PiArrowBendUpRightBold,
   PiPaletteBold,
 } from "react-icons/pi";
+import { CiText } from "react-icons/ci";
 import { Button, OverlayTrigger, Tooltip } from "react-bootstrap";
 
 const colors = [
@@ -39,7 +40,7 @@ const Sidebar: React.FC = () => {
   const [showColorPicker, setShowColorPicker] = useState(false);
 
   const handleToolClick = (
-    tool: "note" | "rectangle" | "circle" | "line"
+    tool: "note" | "rectangle" | "circle" | "line" 
   ) => {
     if (!user || !boardId) return;
     setActiveTool(tool);
@@ -153,7 +154,7 @@ const Sidebar: React.FC = () => {
             <PiPencilSimpleBold size={20} />
           </Button>
         </OverlayTrigger>
-
+                  
         {/* Undo */}
         <OverlayTrigger placement="right" overlay={<Tooltip>Undo</Tooltip>}>
           <Button

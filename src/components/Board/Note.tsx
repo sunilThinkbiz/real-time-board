@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Rnd } from "react-rnd";
 import { Button } from "react-bootstrap";
 
@@ -22,6 +22,10 @@ export interface NoteProps {
   scale?: number;
 }
 
+const isTouchDevice = (): boolean => {
+  return "ontouchstart" in window || navigator.maxTouchPoints > 0;
+};
+
 const Note: React.FC<NoteProps> = ({
   id,
   text: propText,
@@ -42,17 +46,77 @@ const Note: React.FC<NoteProps> = ({
   scale = 1,
 }) => {
   const [editText, setEditText] = useState(propText);
+  const [isEditing, setIsEditing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     setEditText(propText);
   }, [propText]);
 
-  const getOwnerDisplayName = () => {
+  // Auto-focus textarea when note is created (empty text)
+  useEffect(() => {
+    if (selected && !propText && textareaRef.current) {
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
+    }
+  }, [selected, propText]);
+
+  const getOwnerDisplayName = (): string => {
     if (currentUser === createdBy) return "You";
     const userName = userNames?.[createdBy];
     if (userName) return userName;
     if (createdBy.includes("@")) return createdBy.split("@")[0];
     return createdBy || "Unknown User";
+  };
+
+  const handleTextareaFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    setIsEditing(true);
+    onSelect(id);
+    e.stopPropagation();
+  };
+
+  const handleTextareaBlur = () => {
+    setIsEditing(false);
+  };
+
+  const handleTextareaClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    e.stopPropagation();
+    onSelect(id);
+  };
+
+  const handleTextareaTouch = (e: React.TouchEvent<HTMLTextAreaElement>) => {
+    e.stopPropagation();
+    onSelect(id);
+  };
+
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    
+    // If clicking on the textarea, don't handle at container level
+    if (target.tagName === 'TEXTAREA') {
+      return;
+    }
+    
+    e.stopPropagation();
+    onSelect(id);
+  };
+
+  const handleContainerTouch = (e: React.TouchEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    
+    // If touching the textarea, don't handle at container level
+    if (target.tagName === 'TEXTAREA') {
+      return;
+    }
+    
+    // Don't interfere with interactive elements
+    if (["TEXTAREA", "INPUT", "BUTTON", "SVG", "PATH"].includes(target.tagName.toUpperCase())) {
+      return;
+    }
+    
+    onSelect(id);
+    e.stopPropagation();
   };
 
   return (
@@ -61,25 +125,23 @@ const Note: React.FC<NoteProps> = ({
       size={{ width, height }}
       bounds="parent"
       scale={scale}
-      onClick={(e: React.MouseEvent<HTMLDivElement>) => {
-        e.stopPropagation();
-        onSelect(id);
-      }}
+      disableDragging={isEditing} // Disable dragging while editing text
+      enableResizing={!isTouchDevice() ? undefined : { bottomRight: true }}
+      style={{ zIndex: selected ? 1000 : 1 }}
+      onClick={handleContainerClick}
+      onTouchStart={handleContainerTouch}
       onDragStop={(_, data) => onDragStop(id, data.x, data.y)}
       onResizeStop={(_, __, ref, ____, position) => {
         onResize(id, ref.offsetWidth, ref.offsetHeight);
         onDragStop(id, position.x, position.y);
       }}
-      style={{ zIndex: selected ? 1000 : 1 }}
     >
-      {/* Outer wrapper for spacing and glow */}
       <div
         style={{
           width: "100%",
           height: "100%",
           padding: "6px",
           border: selected ? "2px solid #007bff" : "2px solid transparent",
-          // borderRadius: "16px",
           boxShadow: selected
             ? "0 0 10px rgba(0,123,255,0.6)"
             : "0 2px 8px rgba(0,0,0,0.05)",
@@ -87,23 +149,20 @@ const Note: React.FC<NoteProps> = ({
           boxSizing: "border-box",
         }}
       >
-        {/* Inner note card */}
         <div
           style={{
             width: "100%",
             height: "100%",
             backgroundColor: color,
-            // borderRadius: "12px",
-            
-            boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
+            boxShadow:
+              "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            cursor: "move",
+            cursor: isEditing ? "default" : (isTouchDevice() ? "default" : "move"),
             boxSizing: "border-box",
           }}
         >
-          {/* Header with owner and delete */}
           <div
             style={{
               padding: "6px 10px",
@@ -113,6 +172,7 @@ const Note: React.FC<NoteProps> = ({
               justifyContent: "space-between",
               alignItems: "center",
               minHeight: "28px",
+              cursor: isTouchDevice() ? "default" : "move",
             }}
           >
             <small
@@ -131,8 +191,13 @@ const Note: React.FC<NoteProps> = ({
             <Button
               variant="outline-danger"
               size="sm"
-              onClick={(e) => {
+              onClick={(e: React.MouseEvent) => {
                 e.stopPropagation();
+                onDelete(id);
+              }}
+              onTouchEnd={(e: React.TouchEvent) => {
+                e.stopPropagation();
+                e.preventDefault();
                 onDelete(id);
               }}
               style={{
@@ -145,20 +210,10 @@ const Note: React.FC<NoteProps> = ({
                 minWidth: "20px",
                 height: "20px",
               }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#dc3545";
-                e.currentTarget.style.color = "white";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "transparent";
-                e.currentTarget.style.color = "#dc3545";
-              }}
             >
               ×
             </Button>
           </div>
-
-          {/* Text area body */}
           <div
             style={{
               flex: 1,
@@ -168,12 +223,19 @@ const Note: React.FC<NoteProps> = ({
             }}
           >
             <textarea
+              ref={textareaRef}
               value={editText}
-              onChange={(e) => {
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
                 const newText = e.target.value;
                 setEditText(newText);
                 onTextChange(id, newText);
               }}
+              onFocus={handleTextareaFocus}
+              onBlur={handleTextareaBlur}
+              onClick={handleTextareaClick}
+              onTouchStart={handleTextareaTouch}
+              onTouchMove={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
               placeholder="Type your note here..."
               style={{
                 width: "100%",
@@ -182,13 +244,19 @@ const Note: React.FC<NoteProps> = ({
                 background: "transparent",
                 border: "none",
                 outline: "none",
-                fontSize: "13px",
                 lineHeight: "1.4",
                 fontFamily:
                   "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                 color: "#333",
                 cursor: "text",
                 padding: "0",
+                // Enhanced touch support
+                touchAction: "manipulation",
+                WebkitTouchCallout: "none",
+                WebkitTapHighlightColor: "transparent",
+                WebkitUserSelect: "text",
+                userSelect: "text",
+                fontSize: isTouchDevice() ? "16px" : "13px",
               }}
             />
           </div>

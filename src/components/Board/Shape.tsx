@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Rnd } from "react-rnd";
 import { FaTimes } from "react-icons/fa";
 
@@ -28,6 +28,10 @@ interface ShapeProps {
   onSelect: (id: string) => void;
 }
 
+const isTouchDevice = (): boolean => {
+  return "ontouchstart" in window || navigator.maxTouchPoints > 0;
+};
+
 const Shape: React.FC<ShapeProps> = ({
   id,
   type,
@@ -48,6 +52,67 @@ const Shape: React.FC<ShapeProps> = ({
   selected,
   onSelect,
 }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Auto-focus textarea when shape is selected and has no text
+  useEffect(() => {
+    if (selected && !text && textareaRef.current && type !== "line") {
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 100);
+    }
+  }, [selected, text, type]);
+
+  const handleTextareaFocus = (e: React.FocusEvent<HTMLTextAreaElement>) => {
+    setIsEditing(true);
+    onSelect(id);
+    e.stopPropagation();
+  };
+
+  const handleTextareaBlur = () => {
+    setIsEditing(false);
+  };
+
+  const handleTextareaClick = (e: React.MouseEvent<HTMLTextAreaElement>) => {
+    e.stopPropagation();
+    onSelect(id);
+  };
+
+  const handleTextareaTouch = (e: React.TouchEvent<HTMLTextAreaElement>) => {
+    e.stopPropagation();
+    onSelect(id);
+  };
+
+  const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    
+    // If clicking on the textarea, don't handle at container level
+    if (target.tagName === 'TEXTAREA') {
+      return;
+    }
+    
+    e.stopPropagation();
+    onSelect(id);
+  };
+
+  const handleContainerTouch = (e: React.TouchEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    
+    // If touching the textarea, don't handle at container level
+    if (target.tagName === 'TEXTAREA') {
+      return;
+    }
+    
+    // Don't interfere with interactive elements
+    if (["TEXTAREA", "INPUT", "BUTTON", "SVG", "PATH"].includes(target.tagName.toUpperCase())) {
+      return;
+    }
+    
+    onSelect(id);
+    e.stopPropagation();
+  };
+
   const renderShapeContent = () => {
     const baseStyle: React.CSSProperties = {
       width: "100%",
@@ -64,8 +129,16 @@ const Shape: React.FC<ShapeProps> = ({
 
     const editableText = (
       <textarea
+        ref={textareaRef}
         value={text}
         onChange={(e) => onTextUpdate(id, e.target.value)}
+        onFocus={handleTextareaFocus}
+        onBlur={handleTextareaBlur}
+        onClick={handleTextareaClick}
+        onTouchStart={handleTextareaTouch}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+        placeholder="Add text..."
         style={{
           width: "100%",
           height: "100%",
@@ -76,24 +149,43 @@ const Shape: React.FC<ShapeProps> = ({
           color: "#000",
           textAlign: "center",
           fontWeight: "bold",
+          cursor: "text",
+          // Enhanced touch support
+          touchAction: "manipulation",
+          WebkitTouchCallout: "none",
+          WebkitTapHighlightColor: "transparent",
+          WebkitUserSelect: "text",
+          userSelect: "text",
+          // Prevent zoom on iOS
+          fontSize: isTouchDevice() ? "16px" : "14px",
         }}
       />
     );
 
     const staticText = (
-      <div style={{ fontWeight: "bold", color: "#000" }}>{text}</div>
+      <div style={{ fontWeight: "bold", color: "#000", padding: "4px" }}>
+        {text}
+      </div>
     );
 
     switch (type) {
       case "rectangle":
         return (
-          <div style={{ ...baseStyle, borderRadius: 4,boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)", }}>
+          <div style={{ 
+            ...baseStyle, 
+            borderRadius: 4,
+            boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
+          }}>
             {selected ? editableText : staticText}
           </div>
         );
       case "circle":
         return (
-          <div style={{ ...baseStyle, borderRadius: "50%",boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)", }}>
+          <div style={{ 
+            ...baseStyle, 
+            borderRadius: "50%",
+            boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
+          }}>
             {selected ? editableText : staticText}
           </div>
         );
@@ -119,9 +211,9 @@ const Shape: React.FC<ShapeProps> = ({
     <Rnd
       size={{ width, height }}
       position={{ x, y }}
-      disableDragging={false}
+      disableDragging={isEditing} // Disable dragging while editing text
       scale={scale}
-      enableResizing={true}
+      enableResizing={!isEditing && (!isTouchDevice() ? true : { bottomRight: true })} // Disable resizing while editing
       onDragStop={(e, d) => onMove(id, d.x, d.y)}
       onResizeStop={(e, direction, ref, delta, position) => {
         onResize(id, ref.offsetWidth, ref.offsetHeight, rotation);
@@ -131,12 +223,10 @@ const Shape: React.FC<ShapeProps> = ({
       style={{
         transform: type === "line" ? `rotate(${rotation}deg)` : "none",
         zIndex: selected ? 10 : 1,
-        cursor: "move",
+        cursor: isEditing ? "default" : (isTouchDevice() ? "default" : "move"),
       }}
-      onClick={(e: React.MouseEvent) => {
-        e.stopPropagation();
-        onSelect(id);
-      }}
+      onClick={handleContainerClick}
+      onTouchStart={handleContainerTouch}
     >
       <div
         style={{
@@ -147,14 +237,21 @@ const Shape: React.FC<ShapeProps> = ({
           boxSizing: "border-box",
           padding: selected ? 4 : 0,
           borderRadius: type === "circle" ? "50%" : 4,
-          // backgroundColor: "white", // helps show border clearly
         }}
       >
         {renderShapeContent()}
 
         {selected && type !== "line" && (
           <FaTimes
-            onClick={() => onDelete(id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(id);
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onDelete(id);
+            }}
             style={{
               position: "absolute",
               top: -10,
@@ -175,7 +272,15 @@ const Shape: React.FC<ShapeProps> = ({
 
         {selected && type === "line" && (
           <div
-            onClick={() => onDelete(id)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(id);
+            }}
+            onTouchEnd={(e) => {
+              e.stopPropagation();
+              e.preventDefault();
+              onDelete(id);
+            }}
             style={{
               position: "absolute",
               left: width - 10,
