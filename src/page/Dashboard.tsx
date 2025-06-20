@@ -93,7 +93,7 @@ const Dashboard: React.FC = () => {
   const handleLogout = () => signOut(auth);
   return (
     <>
-      <Navbar onLogout={handleLogout} />
+      <Navbar onLogout={handleLogout}onInvite={() => {}} />
       <div className="container py-4">
         <Row className="align-items-center mb-3">
           <Col>
