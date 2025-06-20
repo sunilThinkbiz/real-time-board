@@ -15,6 +15,7 @@ import { CiText } from "react-icons/ci";
 import { Button, OverlayTrigger, Tooltip } from "react-bootstrap";
 
 const colors = [
+  "#000000",
   "#ffc107",
   "#f28b82",
   "#ccff90",
@@ -24,24 +25,22 @@ const colors = [
 ];
 
 const Sidebar: React.FC = () => {
-  const { 
-    activeTool, 
-    setActiveTool, 
-    selectedColor, 
-    setSelectedColor, 
-    undo, 
+  const {
+    activeTool,
+    setActiveTool,
+    selectedColor,
+    setSelectedColor,
+    undo,
     redo,
     canUndo,
-    canRedo
+    canRedo,
   } = useBoard();
   const { user } = useAuth();
   const { boardId } = useParams<{ boardId: string }>();
 
   const [showColorPicker, setShowColorPicker] = useState(false);
 
-  const handleToolClick = (
-    tool: "note" | "rectangle" | "circle" | "line" 
-  ) => {
+  const handleToolClick = (tool: "note" | "rectangle" | "circle" | "line" | "simpleText") => {
     if (!user || !boardId) return;
     setActiveTool(tool);
   };
@@ -53,8 +52,8 @@ const Sidebar: React.FC = () => {
         height: "100vh",
         width: "60px",
         borderRight: "1px solid #ddd",
-        margin:"5px",
-        borderRadius:"20px",
+        margin: "5px",
+        borderRadius: "20px",
         position: "sticky",
         top: 0,
         padding: "10px 0",
@@ -122,7 +121,10 @@ const Sidebar: React.FC = () => {
           </Button>
         </OverlayTrigger>
 
-        <OverlayTrigger placement="right" overlay={<Tooltip>Rectangle</Tooltip>}>
+        <OverlayTrigger
+          placement="right"
+          overlay={<Tooltip>Rectangle</Tooltip>}
+        >
           <Button
             variant={activeTool === "rectangle" ? "primary" : "light"}
             className="p-2"
@@ -154,15 +156,30 @@ const Sidebar: React.FC = () => {
             <PiPencilSimpleBold size={20} />
           </Button>
         </OverlayTrigger>
-                  
+        {/* simple text  */}
+
+        <OverlayTrigger
+          placement="right"
+          overlay={<Tooltip>Simple Text</Tooltip>}
+        >
+          <Button
+            variant={activeTool === "simpleText" ? "primary" : "light"}
+            className="p-2"
+            style={{ borderRadius: "8px" }}
+            onClick={() => handleToolClick("simpleText")}
+          >
+            <CiText size={20} />
+          </Button>
+        </OverlayTrigger>
+
         {/* Undo */}
         <OverlayTrigger placement="right" overlay={<Tooltip>Undo</Tooltip>}>
           <Button
             variant="light"
             className="p-2"
-            style={{ 
+            style={{
               borderRadius: "8px",
-              opacity: canUndo ? 1 : 0.5
+              opacity: canUndo ? 1 : 0.5,
             }}
             onClick={undo}
             disabled={!canUndo}
@@ -176,9 +193,9 @@ const Sidebar: React.FC = () => {
           <Button
             variant="light"
             className="p-2"
-            style={{ 
+            style={{
               borderRadius: "8px",
-              opacity: canRedo ? 1 : 0.5
+              opacity: canRedo ? 1 : 0.5,
             }}
             onClick={redo}
             disabled={!canRedo}

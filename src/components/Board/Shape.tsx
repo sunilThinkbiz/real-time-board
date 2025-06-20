@@ -86,29 +86,33 @@ const Shape: React.FC<ShapeProps> = ({
 
   const handleContainerClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    
+
     // If clicking on the textarea, don't handle at container level
-    if (target.tagName === 'TEXTAREA') {
+    if (target.tagName === "TEXTAREA") {
       return;
     }
-    
+
     e.stopPropagation();
     onSelect(id);
   };
 
   const handleContainerTouch = (e: React.TouchEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    
+
     // If touching the textarea, don't handle at container level
-    if (target.tagName === 'TEXTAREA') {
+    if (target.tagName === "TEXTAREA") {
       return;
     }
-    
+
     // Don't interfere with interactive elements
-    if (["TEXTAREA", "INPUT", "BUTTON", "SVG", "PATH"].includes(target.tagName.toUpperCase())) {
+    if (
+      ["TEXTAREA", "INPUT", "BUTTON", "SVG", "PATH"].includes(
+        target.tagName.toUpperCase()
+      )
+    ) {
       return;
     }
-    
+
     onSelect(id);
     e.stopPropagation();
   };
@@ -171,21 +175,27 @@ const Shape: React.FC<ShapeProps> = ({
     switch (type) {
       case "rectangle":
         return (
-          <div style={{ 
-            ...baseStyle, 
-            borderRadius: 4,
-            boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
-          }}>
+          <div
+            style={{
+              ...baseStyle,
+              borderRadius: 4,
+              boxShadow:
+                "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
+            }}
+          >
             {selected ? editableText : staticText}
           </div>
         );
       case "circle":
         return (
-          <div style={{ 
-            ...baseStyle, 
-            borderRadius: "50%",
-            boxShadow: "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
-          }}>
+          <div
+            style={{
+              ...baseStyle,
+              borderRadius: "50%",
+              boxShadow:
+                "0 4px 8px 0 rgba(0, 0, 0, 0.2), 0 6px 20px 0 rgba(0, 0, 0, 0.19)",
+            }}
+          >
             {selected ? editableText : staticText}
           </div>
         );
@@ -213,7 +223,9 @@ const Shape: React.FC<ShapeProps> = ({
       position={{ x, y }}
       disableDragging={isEditing} // Disable dragging while editing text
       scale={scale}
-      enableResizing={!isEditing && (!isTouchDevice() ? true : { bottomRight: true })} // Disable resizing while editing
+      enableResizing={
+        !isEditing && (!isTouchDevice() ? true : { bottomRight: true })
+      } // Disable resizing while editing
       onDragStop={(e, d) => onMove(id, d.x, d.y)}
       onResizeStop={(e, direction, ref, delta, position) => {
         onResize(id, ref.offsetWidth, ref.offsetHeight, rotation);
@@ -223,7 +235,7 @@ const Shape: React.FC<ShapeProps> = ({
       style={{
         transform: type === "line" ? `rotate(${rotation}deg)` : "none",
         zIndex: selected ? 10 : 1,
-        cursor: isEditing ? "default" : (isTouchDevice() ? "default" : "move"),
+        cursor: isEditing ? "default" : isTouchDevice() ? "default" : "move",
       }}
       onClick={handleContainerClick}
       onTouchStart={handleContainerTouch}
@@ -247,7 +259,7 @@ const Shape: React.FC<ShapeProps> = ({
               e.stopPropagation();
               onDelete(id);
             }}
-            onTouchEnd={(e) => {
+            onPointerDown={(e) => {
               e.stopPropagation();
               e.preventDefault();
               onDelete(id);
@@ -276,7 +288,7 @@ const Shape: React.FC<ShapeProps> = ({
               e.stopPropagation();
               onDelete(id);
             }}
-            onTouchEnd={(e) => {
+            onPointerDown={(e) => {
               e.stopPropagation();
               e.preventDefault();
               onDelete(id);

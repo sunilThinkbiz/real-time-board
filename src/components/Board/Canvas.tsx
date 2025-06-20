@@ -4,6 +4,7 @@ import Note from "./Note";
 import Shape from "./Shape";
 import { useAuth } from "../../context/AuthContext";
 import { useBoard } from "../../context/BoardContext";
+import SimpleText from "./SimpleText";
 
 interface CanvasProps {
   boardId: string;
@@ -20,12 +21,16 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
     userNames,
     createNote,
     createShape,
+    createSimpleText,
+    simpleTexts,
     cursors,
     trackCursor,
     updateNote,
     updateShape,
+    updateSimpleText,
     deleteNote,
     deleteShape,
+    deleteSimpleText,
   } = useBoard();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -98,20 +103,20 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
 
   // Check if the target is an interactive element
   const isInteractiveElement = (target: HTMLElement): boolean => {
-    const interactiveTags = ['TEXTAREA', 'INPUT', 'BUTTON', 'SELECT'];
-    const interactiveRoles = ['button', 'textbox', 'combobox'];
-    
+    const interactiveTags = ["TEXTAREA", "INPUT", "BUTTON", "SELECT"];
+    const interactiveRoles = ["button", "textbox", "combobox"];
+
     return (
       interactiveTags.includes(target.tagName.toUpperCase()) ||
-      interactiveRoles.includes(target.getAttribute('role') || '') ||
+      interactiveRoles.includes(target.getAttribute("role") || "") ||
       target.isContentEditable ||
-      target.closest('textarea, input, button, select') !== null
+      target.closest("textarea, input, button, select") !== null
     );
   };
 
   const handleCanvasClick = async (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    
+
     // Don't create new elements if clicking on interactive elements
     if (isInteractiveElement(target)) {
       return;
@@ -126,8 +131,14 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
     try {
       if (activeTool === "note") {
         await createNote(x, y);
-      } else {
+      } else if (
+        activeTool === "rectangle" ||
+        activeTool === "circle" ||
+        activeTool === "line"
+      ) {
         await createShape(activeTool, x, y);
+      } else if (activeTool === "simpleText") {
+        await createSimpleText(x, y);
       }
     } catch (error) {
       console.error("Error creating element:", error);
@@ -136,7 +147,7 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
 
   const handleCanvasTouch = async (e: React.TouchEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
-    
+
     // Don't create new elements if touching interactive elements
     if (isInteractiveElement(target)) {
       return;
@@ -155,8 +166,14 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
     try {
       if (activeTool === "note") {
         await createNote(x, y);
-      } else {
+      } else if (
+        activeTool === "rectangle" ||
+        activeTool === "circle" ||
+        activeTool === "line"
+      ) {
         await createShape(activeTool, x, y);
+      } else if (activeTool === "simpleText") {
+        await createSimpleText(x, y);
       }
     } catch (error) {
       console.error("Error creating element:", error);
@@ -170,7 +187,13 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
       console.error("Error updating note:", error);
     }
   };
-
+  const handleSimpleTextUpdate = async (id: string, updates: Partial<any>) => {
+    try {
+      await updateSimpleText(id, updates);
+    } catch (error) {
+      console.error("Error updating note:", error);
+    }
+  };
   const handleShapeUpdate = async (id: string, updates: Partial<any>) => {
     try {
       await updateShape(id, updates);
@@ -187,7 +210,14 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
       console.error("Error deleting note:", error);
     }
   };
-
+  const handleDeleteSimpleText = async (id: string) => {
+    try {
+      await deleteSimpleText(id);
+      setSelectedId(null);
+    } catch (error) {
+      console.error("Error deleting note:", error);
+    }
+  };
   const handleDeleteShape = async (id: string) => {
     try {
       await deleteShape(id);
@@ -209,12 +239,15 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
 
         const noteExists = notes.find((n) => n.id === selectedId);
         const shapeExists = shapes.find((s) => s.id === selectedId);
-
+        const simpleText = simpleTexts.find((s) => s.id === selectedId);
         if (noteExists) {
           deleteNote(selectedId);
           setSelectedId(null);
         } else if (shapeExists) {
           deleteShape(selectedId);
+          setSelectedId(null);
+        } else if (simpleText) {
+          deleteSimpleText(selectedId);
           setSelectedId(null);
         }
       }
@@ -224,7 +257,15 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedId, notes, shapes, deleteNote, deleteShape]);
+  }, [
+    selectedId,
+    notes,
+    shapes,
+    simpleTexts,
+    deleteNote,
+    deleteShape,
+    deleteSimpleText,
+  ]);
 
   return (
     <div
@@ -264,7 +305,9 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
             userNames={userNames}
             onSelect={(id) => setSelectedId(id)}
             onDragStop={(id, x, y) => handleNoteUpdate(id, { x, y })}
-            onResize={(id, w, h) => handleNoteUpdate(id, { width: w, height: h })}
+            onResize={(id, w, h) =>
+              handleNoteUpdate(id, { width: w, height: h })
+            }
             onDelete={handleDeleteNote}
             onTextChange={(id, text) => handleNoteUpdate(id, { text })}
           />
@@ -279,9 +322,31 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
             selected={selectedId === shape.id}
             onSelect={(id) => setSelectedId(id)}
             onMove={(id, x, y) => handleShapeUpdate(id, { x, y })}
-            onResize={(id, w, h) => handleShapeUpdate(id, { width: w, height: h })}
+            onResize={(id, w, h) =>
+              handleShapeUpdate(id, { width: w, height: h })
+            }
             onDelete={handleDeleteShape}
             onTextUpdate={(id, text) => handleShapeUpdate(id, { text })}
+          />
+        ))}
+        {simpleTexts.map((text) => (
+          <SimpleText
+            key={text.id}
+            {...text}
+            scale={scale}
+            selected={selectedId === text.id}
+            onSelect={(id) => setSelectedId(id)}
+            onDelete={(id) => handleDeleteSimpleText(id)}
+            onTextChange={(id, newText) =>
+              handleSimpleTextUpdate(id, { text: newText })
+            }
+            onResize={(id, w, h) =>
+              handleSimpleTextUpdate(id, { width: w, height: h })
+            }
+            onDragStop={(id, x, y) => handleSimpleTextUpdate(id, { x, y })}
+            onRotate={(id, rotation) =>
+              handleSimpleTextUpdate(id, { rotation })
+            }
           />
         ))}
 

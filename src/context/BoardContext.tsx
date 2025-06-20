@@ -11,8 +11,13 @@ import { database } from "../firebase/firebaseConfig";
 import { useAuth } from "./AuthContext";
 import { v4 as uuid } from "uuid";
 
-
-export type ToolType = "note" | "rectangle" | "circle" | "line" | null;
+export type ToolType =
+  | "note"
+  | "rectangle"
+  | "circle"
+  | "line"
+  | "simpleText"
+  | null;
 
 export type NoteType = {
   id: string;
@@ -37,11 +42,22 @@ export type ShapeType = {
   text: string;
   createdBy: string;
 };
-
+export type SimpleTextType = {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  color: string;
+  createdBy: string;
+};
 // Individual operation types for undo/redo
 type Operation =
   | { type: "CREATE_NOTE"; data: NoteType }
   | { type: "CREATE_SHAPE"; data: ShapeType }
+  | { type: "CREATE_SIMPLE_TEXT"; data: SimpleTextType }
   | {
       type: "UPDATE_NOTE";
       id: string;
@@ -54,13 +70,19 @@ type Operation =
       oldData: Partial<ShapeType>;
       newData: Partial<ShapeType>;
     }
+  | {
+      type: "UPDATE_SIMPLE_TEXT";
+      id: string;
+      oldData: Partial<SimpleTextType>;
+      newData: Partial<SimpleTextType>;
+    }
   | { type: "DELETE_NOTE"; data: NoteType }
-  | { type: "DELETE_SHAPE"; data: ShapeType };
+  | { type: "DELETE_SHAPE"; data: ShapeType }
+  | { type: "DELETE_SIMPLE_TEXT"; data: SimpleTextType };
 
 interface BoardContextType {
   activeTool: ToolType;
   setActiveTool: (tool: ToolType) => void;
-
   selectedColor: string;
   setSelectedColor: (color: string) => void;
 
@@ -70,6 +92,7 @@ interface BoardContextType {
   trackCursor: (x: number, y: number) => void;
   notes: NoteType[];
   shapes: ShapeType[];
+  simpleTexts: SimpleTextType[];
 
   // User names mapping
   userNames: Record<string, string>;
@@ -77,10 +100,16 @@ interface BoardContextType {
   // CRUD operations
   createNote: (x: number, y: number) => Promise<void>;
   createShape: (type: ShapeType["type"], x: number, y: number) => Promise<void>;
+  createSimpleText: (x: number, y: number) => Promise<void>;
   updateNote: (id: string, updates: Partial<NoteType>) => Promise<void>;
   updateShape: (id: string, updates: Partial<ShapeType>) => Promise<void>;
+  updateSimpleText: (
+    id: string,
+    updates: Partial<SimpleTextType>
+  ) => Promise<void>;
   deleteNote: (id: string) => Promise<void>;
   deleteShape: (id: string) => Promise<void>;
+  deleteSimpleText: (id: string) => Promise<void>;
 
   undo: () => void;
   redo: () => void;
@@ -94,8 +123,6 @@ type CursorData = {
   color: string;
   lastActive: number;
 };
-
-
 
 const BoardContext = createContext<BoardContextType | undefined>(undefined);
 
@@ -112,14 +139,14 @@ export const BoardProvider: React.FC<{
 
   const [notes, setNotes] = useState<NoteType[]>([]);
   const [shapes, setShapes] = useState<ShapeType[]>([]);
+  const [simpleTexts, setSimpleTexts] = useState<SimpleTextType[]>([]);
+
   const [userNames, setUserNames] = useState<Record<string, string>>({});
 
   // Individual operation stacks for undo/redo
   const [undoStack, setUndoStack] = useState<Operation[]>([]);
   const [redoStack, setRedoStack] = useState<Operation[]>([]);
   const [cursors, setCursors] = useState<{ [uid: string]: CursorData }>({});
-
-
 
   // Track if we're in the middle of an undo/redo operation
   const isUndoRedoOperation = useRef(false);
@@ -230,16 +257,13 @@ export const BoardProvider: React.FC<{
     });
   };
 
-
-
-
-
   // Firebase listeners
   useEffect(() => {
     if (!boardId) return;
 
     const notesRef = ref(database, `boards/${boardId}/notes`);
     const shapesRef = ref(database, `boards/${boardId}/shapes`);
+    const simpleTextRef = ref(database, `boards/${boardId}/simpleTexts`);
 
     const unsubNotes = onValue(
       notesRef,
@@ -302,10 +326,33 @@ export const BoardProvider: React.FC<{
         console.error("Error loading shapes:", error);
       }
     );
-
+    const unsubSimpleText = onValue(
+      simpleTextRef,
+      (snapshot) => {
+        const data = snapshot.val();
+        const loaded: SimpleTextType[] = data
+          ? Object.entries(data).map(([key, val]: [string, any]) => ({
+              id: key,
+              text: val.text || "",
+              x: val.x || 0,
+              y: val.y || 0,
+              width: val.width || 200,
+              height: val.height || 50,
+              rotation: val.rotation || 0,
+              createdBy: val.createdBy || "",
+              color: val.color || "#000",
+            }))
+          : [];
+        setSimpleTexts(loaded);
+      },
+      (error) => {
+        console.error("Error loading simpleTexts:", error);
+      }
+    );
     return () => {
       unsubNotes();
       unsubShapes();
+      unsubSimpleText();
     };
   }, [boardId, fetchUserNames]);
 
@@ -388,6 +435,38 @@ export const BoardProvider: React.FC<{
     },
     [user, boardId, selectedColor, addToUndoStack]
   );
+ const createSimpleText = useCallback(
+  async (x: number, y: number) => {
+    const defaultColor = "#000000";
+    if (!user || !boardId) return;
+
+    const id = uuid();
+    const newText: SimpleTextType = {
+      id,
+      text: "",
+      x,
+      y,
+      width: 200,
+      height: 50,
+      color: selectedColor || defaultColor,
+      rotation: 0,
+      createdBy: user.uid, // ✅ required for Firebase rules
+    };
+
+    try {
+      await update(
+        ref(database, `boards/${boardId}/simpleTexts/${id}`),
+        newText // ✅ send full object
+      );
+
+      addToUndoStack({ type: "CREATE_SIMPLE_TEXT", data: newText });
+      setRedoStack([]);
+    } catch (error) {
+      console.error("Error creating simpleText:", error);
+    }
+  },
+  [user, boardId, selectedColor, addToUndoStack]
+);
 
   const updateNote = useCallback(
     async (id: string, updates: Partial<NoteType>) => {
@@ -462,7 +541,40 @@ export const BoardProvider: React.FC<{
     },
     [boardId, shapes, addToUndoStack]
   );
+  const updateSimpleText = useCallback(
+    async (id: string, updates: Partial<SimpleTextType>) => {
+      if (!boardId) return;
+      // Get current note data for undo
+      const currentText = simpleTexts.find((n) => n.id === id);
+      if (!currentText) return;
+      const oldData: Partial<SimpleTextType> = {};
+      Object.keys(updates).forEach((key) => {
+        const typedKey = key as keyof SimpleTextType;
+        (oldData as any)[typedKey] = currentText[typedKey];
+      });
+      try {
+        await update(
+          ref(database, `boards/${boardId}/simpleTexts/${id}`),
+          updates
+        );
 
+        setUndoStack((prev) => [
+          ...prev,
+          {
+            type: "UPDATE_SIMPLE_TEXT",
+            id,
+            oldData,
+            newData: updates,
+          },
+        ]);
+
+        setRedoStack([]);
+      } catch (error) {
+        console.error("Error updating simpleText:", error);
+      }
+    },
+    [boardId, simpleTexts, addToUndoStack]
+  );
   const deleteNote = useCallback(
     async (id: string) => {
       if (!boardId) return;
@@ -504,7 +616,25 @@ export const BoardProvider: React.FC<{
     },
     [boardId, shapes, addToUndoStack]
   );
+  const deleteSimpleText = useCallback(
+    async (id: string) => {
+      if (!boardId) return;
+      const simpleTextToDelete = simpleTexts.find((n) => n.id === id);
+      if (!simpleTextToDelete) return;
+      try {
+        await remove(ref(database, `boards/${boardId}/simpleTexts/${id}`));
 
+        addToUndoStack({
+          type: "DELETE_SIMPLE_TEXT",
+          data: simpleTextToDelete,
+        });
+        setRedoStack([]);
+      } catch (error) {
+        console.error("Error deleting simpleText:", error);
+      }
+    },
+    [boardId, simpleTexts, addToUndoStack]
+  );
   // Undo/Redo operations
   const undo = useCallback(async () => {
     if (undoStack.length === 0 || !boardId) return;
@@ -525,6 +655,14 @@ export const BoardProvider: React.FC<{
             ref(database, `boards/${boardId}/shapes/${lastOperation.data.id}`)
           );
           break;
+        case "CREATE_SIMPLE_TEXT":
+          await remove(
+            ref(
+              database,
+              `boards/${boardId}/simpleTexts/${lastOperation.data.id}`
+            )
+          );
+          break;
 
         case "UPDATE_NOTE":
           await update(
@@ -539,6 +677,13 @@ export const BoardProvider: React.FC<{
             lastOperation.oldData
           );
           break;
+        case "UPDATE_SIMPLE_TEXT":
+          await update(
+            ref(database, `boards/${boardId}/simpleTexts/${lastOperation.id}`),
+            lastOperation.oldData
+          );
+
+          break;
 
         case "DELETE_NOTE":
           await set(
@@ -550,6 +695,15 @@ export const BoardProvider: React.FC<{
         case "DELETE_SHAPE":
           await set(
             ref(database, `boards/${boardId}/shapes/${lastOperation.data.id}`),
+            lastOperation.data
+          );
+          break;
+        case "DELETE_SIMPLE_TEXT":
+          await set(
+            ref(
+              database,
+              `boards/${boardId}/simpleTexts/${lastOperation.data.id}`
+            ),
             lastOperation.data
           );
           break;
@@ -605,6 +759,15 @@ export const BoardProvider: React.FC<{
             operationToRedo.data
           );
           break;
+        case "CREATE_SIMPLE_TEXT":
+          await set(
+            ref(
+              database,
+              `boards/${boardId}/simpleTexts/${operationToRedo.data.id}`
+            ),
+            operationToRedo.data
+          );
+          break;
 
         case "UPDATE_NOTE":
           await update(
@@ -619,7 +782,15 @@ export const BoardProvider: React.FC<{
             operationToRedo.newData
           );
           break;
-
+        case "UPDATE_SIMPLE_TEXT":
+          await update(
+            ref(
+              database,
+              `boards/${boardId}/simpleTexts/${operationToRedo.id}`
+            ),
+            operationToRedo.newData
+          );
+          break;
         case "DELETE_NOTE":
           await remove(
             ref(database, `boards/${boardId}/notes/${operationToRedo.data.id}`)
@@ -629,6 +800,14 @@ export const BoardProvider: React.FC<{
         case "DELETE_SHAPE":
           await remove(
             ref(database, `boards/${boardId}/shapes/${operationToRedo.data.id}`)
+          );
+          break;
+        case "DELETE_SIMPLE_TEXT":
+          await remove(
+            ref(
+              database,
+              `boards/${boardId}/simpleTexts/${operationToRedo.data.id}`
+            )
           );
           break;
       }
@@ -671,15 +850,19 @@ export const BoardProvider: React.FC<{
         setSelectedElementId,
         notes,
         shapes,
+        simpleTexts,
         userNames,
         createNote,
         cursors,
         trackCursor,
         createShape,
+        createSimpleText,
         updateNote,
         updateShape,
+        updateSimpleText,
         deleteNote,
         deleteShape,
+        deleteSimpleText,
         undo,
         redo,
         canUndo,
