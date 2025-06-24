@@ -8,6 +8,7 @@ import {
   Tooltip
 } from "react-bootstrap";
 import { useAuth } from "../context/AuthContext";
+
 import { useNavigate, useParams } from "react-router-dom";
 import { useBoardUsers } from "../hook/useBoardUsers";
 import { NAVBAR } from "../appConstant";
@@ -19,10 +20,13 @@ import { FiShare2, FiLogOut } from "react-icons/fi";
 interface NavbarProps {
   onLogout: () => void;
   onInvite: () => void;
+  userPermission?: string;
 }
 
-const Navbar: React.FC<NavbarProps> = ({ onLogout, onInvite }) => {
+const Navbar: React.FC<NavbarProps> = ({ onLogout, onInvite,userPermission }) => {
   const { user, loading } = useAuth();
+  
+
   const { boardId } = useParams<{ boardId: string }>();
   const users = useBoardUsers(boardId || "default");
   const onlineUsers = Object.values(users || {}).filter((u) => u.online);
@@ -108,17 +112,21 @@ const Navbar: React.FC<NavbarProps> = ({ onLogout, onInvite }) => {
             )}
 
             {/* ✅ Share Board Button */}
-            {boardId && (
-              <OverlayTrigger
-              placement="bottom"
-              overlay={<Tooltip id="tooltip-share">Copy share link</Tooltip>}
-            >
-              <Button variant="primary" onClick={onInvite} className="d-flex align-items-center justify-content-center m-2">
-                <FiShare2 />
-              </Button>
-            </OverlayTrigger>
+           {boardId && userPermission !== "view" && userPermission !== "none" && (
+  <OverlayTrigger
+    placement="bottom"
+    overlay={<Tooltip id="tooltip-share">Copy share link</Tooltip>}
+  >
+    <Button
+      variant="primary"
+      onClick={onInvite}
+      className="d-flex align-items-center justify-content-center m-2"
+    >
+      <FiShare2 />
+    </Button>
+  </OverlayTrigger>
+)}
 
-            )}
 
             {/* ✅ Logout Button */}
              <OverlayTrigger

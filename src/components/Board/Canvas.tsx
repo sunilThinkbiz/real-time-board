@@ -31,12 +31,13 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
     deleteNote,
     deleteShape,
     deleteSimpleText,
+     userPermission,
   } = useBoard();
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [scale, setScale] = useState(1);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-
+const isReadOnly = userPermission === "view" || userPermission === "none";
   const getTouchOrMouseCoords = (
     clientX: number,
     clientY: number
@@ -115,6 +116,7 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
   };
 
   const handleCanvasClick = async (e: React.MouseEvent<HTMLDivElement>) => {
+    if (isReadOnly) return;
     const target = e.target as HTMLElement;
 
     // Don't create new elements if clicking on interactive elements
@@ -146,6 +148,7 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
   };
 
   const handleCanvasTouch = async (e: React.TouchEvent<HTMLDivElement>) => {
+    if (isReadOnly) return;
     const target = e.target as HTMLElement;
 
     // Don't create new elements if touching interactive elements
@@ -230,11 +233,13 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't delete when typing in text inputs
+      if (isReadOnly) return;
       if (e.target && isInteractiveElement(e.target as HTMLElement)) {
         return;
       }
 
       if (e.key === "Backspace" && selectedId) {
+        if (isReadOnly) return;
         e.preventDefault();
 
         const noteExists = notes.find((n) => n.id === selectedId);
@@ -280,7 +285,8 @@ const Canvas: React.FC<CanvasProps> = ({ boardId }) => {
         background: "#f5f5f5",
         position: "relative",
         cursor: "grab",
-        touchAction: "pan-x pan-y pinch-zoom", // Allow panning and zooming
+        touchAction: "pan-x pan-y pinch-zoom", 
+        pointerEvents: isReadOnly ? "none" : "auto",
       }}
     >
       <div

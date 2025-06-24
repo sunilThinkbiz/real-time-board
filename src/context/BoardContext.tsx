@@ -85,7 +85,7 @@ interface BoardContextType {
   setActiveTool: (tool: ToolType) => void;
   selectedColor: string;
   setSelectedColor: (color: string) => void;
-
+  setActiveToolInternal: (tool: ToolType) => void;
   selectedElementId: string | null;
   setSelectedElementId: (id: string | null) => void;
   cursors: Record<string, any>;
@@ -93,7 +93,9 @@ interface BoardContextType {
   notes: NoteType[];
   shapes: ShapeType[];
   simpleTexts: SimpleTextType[];
-
+  userPermission: "owner" | "edit" | "view" | "none";
+  // Optional: expose read-only helper
+  isReadOnly: boolean;
   // User names mapping
   userNames: Record<string, string>;
 
@@ -123,13 +125,18 @@ type CursorData = {
   color: string;
   lastActive: number;
 };
-
+interface BoardProviderProps {
+  children: React.ReactNode;
+  boardId: string;
+  userPermission: "owner" | "edit" | "view" | "none";
+}
 const BoardContext = createContext<BoardContextType | undefined>(undefined);
 
-export const BoardProvider: React.FC<{
-  boardId: string;
-  children: React.ReactNode;
-}> = ({ boardId, children }) => {
+export const BoardProvider: React.FC<BoardProviderProps> = ({
+  children,
+  boardId,
+  userPermission,
+}) => {
   const { user } = useAuth();
   const [activeTool, setActiveTool] = useState<ToolType>(null);
   const [selectedColor, setSelectedColor] = useState<string>("#FFEB3B");
@@ -150,6 +157,7 @@ export const BoardProvider: React.FC<{
 
   // Track if we're in the middle of an undo/redo operation
   const isUndoRedoOperation = useRef(false);
+  const isReadOnly = userPermission === "view";
 
   // Function to fetch user names
   const fetchUserNames = useCallback(
@@ -376,7 +384,7 @@ export const BoardProvider: React.FC<{
   // CRUD Operations with undo tracking
   const createNote = useCallback(
     async (x: number, y: number) => {
-      if (!user || !boardId) return;
+      if (isReadOnly || !user || !boardId) return;
 
       const id = uuid();
       const newNote: NoteType = {
@@ -401,12 +409,12 @@ export const BoardProvider: React.FC<{
         console.error("Error creating note:", error);
       }
     },
-    [user, boardId, selectedColor, addToUndoStack]
+    [isReadOnly, user, boardId, selectedColor, addToUndoStack]
   );
 
   const createShape = useCallback(
     async (type: ShapeType["type"], x: number, y: number) => {
-      if (!user || !boardId) return;
+      if (isReadOnly || !user || !boardId) return;
 
       const id = uuid();
       const newShape: ShapeType = {
@@ -433,44 +441,44 @@ export const BoardProvider: React.FC<{
         console.error("Error creating shape:", error);
       }
     },
-    [user, boardId, selectedColor, addToUndoStack]
+    [isReadOnly, user, boardId, selectedColor, addToUndoStack]
   );
- const createSimpleText = useCallback(
-  async (x: number, y: number) => {
-    const defaultColor = "#000000";
-    if (!user || !boardId) return;
+  const createSimpleText = useCallback(
+    async (x: number, y: number) => {
+      const defaultColor = "#000000";
+      if (isReadOnly || !user || !boardId) return;
 
-    const id = uuid();
-    const newText: SimpleTextType = {
-      id,
-      text: "",
-      x,
-      y,
-      width: 200,
-      height: 50,
-      color: selectedColor || defaultColor,
-      rotation: 0,
-      createdBy: user.uid, // ✅ required for Firebase rules
-    };
+      const id = uuid();
+      const newText: SimpleTextType = {
+        id,
+        text: "",
+        x,
+        y,
+        width: 200,
+        height: 50,
+        color: selectedColor || defaultColor,
+        rotation: 0,
+        createdBy: user.uid, // ✅ required for Firebase rules
+      };
 
-    try {
-      await update(
-        ref(database, `boards/${boardId}/simpleTexts/${id}`),
-        newText // ✅ send full object
-      );
+      try {
+        await update(
+          ref(database, `boards/${boardId}/simpleTexts/${id}`),
+          newText // ✅ send full object
+        );
 
-      addToUndoStack({ type: "CREATE_SIMPLE_TEXT", data: newText });
-      setRedoStack([]);
-    } catch (error) {
-      console.error("Error creating simpleText:", error);
-    }
-  },
-  [user, boardId, selectedColor, addToUndoStack]
-);
+        addToUndoStack({ type: "CREATE_SIMPLE_TEXT", data: newText });
+        setRedoStack([]);
+      } catch (error) {
+        console.error("Error creating simpleText:", error);
+      }
+    },
+    [isReadOnly, user, boardId, selectedColor, addToUndoStack]
+  );
 
   const updateNote = useCallback(
     async (id: string, updates: Partial<NoteType>) => {
-      if (!boardId) return;
+      if (isReadOnly || !user || !boardId) return;
 
       // Get current note data for undo
       const currentNote = notes.find((n) => n.id === id);
@@ -502,13 +510,12 @@ export const BoardProvider: React.FC<{
         console.error("Error updating note:", error);
       }
     },
-    [boardId, notes, addToUndoStack]
+    [isReadOnly, boardId, notes, addToUndoStack]
   );
 
   const updateShape = useCallback(
     async (id: string, updates: Partial<ShapeType>) => {
-      if (!boardId) return;
-
+      if (isReadOnly || !user || !boardId) return;
       // Get current shape data for undo
       const currentShape = shapes.find((s) => s.id === id);
       if (!currentShape) return;
@@ -539,11 +546,11 @@ export const BoardProvider: React.FC<{
         console.error("Error updating shape:", error);
       }
     },
-    [boardId, shapes, addToUndoStack]
+    [isReadOnly, boardId, shapes, addToUndoStack]
   );
   const updateSimpleText = useCallback(
     async (id: string, updates: Partial<SimpleTextType>) => {
-      if (!boardId) return;
+      if (isReadOnly || !user || !boardId) return;
       // Get current note data for undo
       const currentText = simpleTexts.find((n) => n.id === id);
       if (!currentText) return;
@@ -573,11 +580,11 @@ export const BoardProvider: React.FC<{
         console.error("Error updating simpleText:", error);
       }
     },
-    [boardId, simpleTexts, addToUndoStack]
+    [isReadOnly, boardId, simpleTexts, addToUndoStack]
   );
   const deleteNote = useCallback(
     async (id: string) => {
-      if (!boardId) return;
+      if (isReadOnly || !user || !boardId) return;
 
       // Get note data for undo
       const noteToDelete = notes.find((n) => n.id === id);
@@ -593,12 +600,12 @@ export const BoardProvider: React.FC<{
         console.error("Error deleting note:", error);
       }
     },
-    [boardId, notes, addToUndoStack]
+    [isReadOnly, boardId, notes, addToUndoStack]
   );
 
   const deleteShape = useCallback(
     async (id: string) => {
-      if (!boardId) return;
+      if (isReadOnly || !user || !boardId) return;
 
       // Get shape data for undo
       const shapeToDelete = shapes.find((s) => s.id === id);
@@ -614,11 +621,11 @@ export const BoardProvider: React.FC<{
         console.error("Error deleting shape:", error);
       }
     },
-    [boardId, shapes, addToUndoStack]
+    [isReadOnly, boardId, shapes, addToUndoStack]
   );
   const deleteSimpleText = useCallback(
     async (id: string) => {
-      if (!boardId) return;
+      if (isReadOnly || !user || !boardId) return;
       const simpleTextToDelete = simpleTexts.find((n) => n.id === id);
       if (!simpleTextToDelete) return;
       try {
@@ -633,11 +640,11 @@ export const BoardProvider: React.FC<{
         console.error("Error deleting simpleText:", error);
       }
     },
-    [boardId, simpleTexts, addToUndoStack]
+    [isReadOnly, boardId, simpleTexts, addToUndoStack]
   );
   // Undo/Redo operations
   const undo = useCallback(async () => {
-    if (undoStack.length === 0 || !boardId) return;
+    if (isReadOnly || !user || undoStack.length === 0 || !boardId) return;
 
     const lastOperation = undoStack[undoStack.length - 1];
     isUndoRedoOperation.current = true;
@@ -718,7 +725,7 @@ export const BoardProvider: React.FC<{
         isUndoRedoOperation.current = false;
       }, 100);
     }
-  }, [undoStack, boardId]);
+  }, [isReadOnly, undoStack, boardId]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -736,7 +743,7 @@ export const BoardProvider: React.FC<{
   }, [undo]);
 
   const redo = useCallback(async () => {
-    if (redoStack.length === 0 || !boardId) return;
+    if (isReadOnly || !user || redoStack.length === 0 || !boardId) return;
 
     const operationToRedo = redoStack[0];
     isUndoRedoOperation.current = true;
@@ -838,12 +845,18 @@ export const BoardProvider: React.FC<{
   }, [redo]);
   const canUndo = undoStack.length > 0;
   const canRedo = redoStack.length > 0;
-
+  const setActiveToolInternal = (tool: ToolType) => {
+    if (userPermission === "view") return;
+    setActiveTool(tool);
+  };
   return (
     <BoardContext.Provider
       value={{
         activeTool,
         setActiveTool,
+        setActiveToolInternal,
+        userPermission,
+        isReadOnly,
         selectedColor,
         setSelectedColor,
         selectedElementId,

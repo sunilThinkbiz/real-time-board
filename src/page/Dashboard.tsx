@@ -1,10 +1,9 @@
-// Dashboard.tsx
 import React, { useState, useEffect } from "react";
 import { Button, Row, Col } from "react-bootstrap";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { auth, database } from "../firebase/firebaseConfig";
-import { ref, onValue, push, set, remove } from "firebase/database";
+import { ref, onValue, push, set, remove, get } from "firebase/database";
 import CreateBoardModal from "./CreateBoardModal";
 import BoardsTable from "./BoardsTable";
 import Navbar from "../components/Nav";
@@ -15,6 +14,7 @@ interface Board {
   title: string;
   createdAt: number;
   invitedFrom?: string;
+  ownerName: string;
 }
 
 const Dashboard: React.FC = () => {
@@ -36,68 +36,96 @@ const Dashboard: React.FC = () => {
   }, [ownerUid]);
 
   useEffect(() => {
-    if (!ownerUid) return;
-    const boardsRef = ref(database, `userBoards/${ownerUid}`);
-    return onValue(boardsRef, (snapshot) => {
-      const data = snapshot.val() || {};
-      const list: Board[] = Object.entries(data).map(([key, value]: any) => ({
-        boardId: key,
-        title: value.title || key,
-        createdAt: value.createdAt,
-        invitedFrom: value.invitedFrom || "",
-      }));
-      setBoards(list);
-    });
-  }, [ownerUid]);
+    if (!user) return;
+    const boardsRef = ref(database, `boards`);
 
-  // Watch online users for each board
+    return onValue(boardsRef, async (snapshot) => {
+      const data = snapshot.val() || {};
+
+      const fetchedBoards = await Promise.all(
+        Object.entries(data).map(async ([boardId, boardData]: any) => {
+          const isOwner = boardData.owner === user.uid;
+          const isSharedWithUser = boardData.sharedWith?.[user.uid];
+
+          if (!isOwner && !isSharedWithUser) return null;
+
+          // Resolve owner name from /users/{uid}
+          let ownerName = "Unknown";
+          if (boardData.owner) {
+            const ownerSnap = await get(
+              ref(database, `users/${boardData.owner}`)
+            );
+            if (ownerSnap.exists()) {
+              const userData = ownerSnap.val();
+              console.log(userData);
+              ownerName = userData.name;
+            }
+          }
+
+          return {
+            boardId,
+            title: boardData.title || "Untitled",
+            createdAt: boardData.createdAt || 0,
+            invitedFrom: isOwner ? undefined : boardData.owner,
+            ownerName,
+          } as Board;
+        })
+      );
+
+      setBoards(fetchedBoards.filter((b): b is Board => b !== null));
+    });
+  }, [user]);
+
   useEffect(() => {
     const unsubscribes: Array<() => void> = [];
+
     boards.forEach((board) => {
       const usersRef = ref(database, `boards/${board.boardId}/users`);
       const unsub = onValue(usersRef, (snap) => {
         const data = snap.val() || {};
-       const online = Object.values(data).filter((u: any) => u.online).length;
-      setOnlineCounts((prev) => ({ ...prev, [board.boardId]: online }));
+        const online = Object.values(data).filter((u: any) => u.online).length;
+        setOnlineCounts((prev) => ({ ...prev, [board.boardId]: online }));
       });
+
       unsubscribes.push(() => unsub());
     });
+
     return () => unsubscribes.forEach((unsub) => unsub());
   }, [boards]);
 
   const handleCreateBoard = async (title: string) => {
-    if (!ownerUid) return;
-    const boardsRef = ref(database, "boards");
-    const newBoardRef = push(boardsRef);
+    if (!user) return;
+
+    const newBoardRef = push(ref(database, "boards"));
     const boardId = newBoardRef.key as string;
 
     const newBoardData = {
       createdAt: Date.now(),
-      createdBy: ownerUid,
       title,
+      owner: user.uid,
     };
 
     await set(newBoardRef, newBoardData);
-
-    const userBoardRef = ref(database, `userBoards/${ownerUid}/${boardId}`);
-    await set(userBoardRef, newBoardData);
+    await set(ref(database, `userBoards/${user.uid}/${boardId}`), true);
 
     navigate(`/board/${boardId}`);
   };
 
   const handleDeleteBoard = async (boardId: string) => {
-    if (!ownerUid) return;
+    if (!user) return;
     await remove(ref(database, `boards/${boardId}`));
-    await remove(ref(database, `userBoards/${ownerUid}/${boardId}`));
+    await remove(ref(database, `userBoards/${user.uid}/${boardId}`));
   };
+
   const handleLogout = () => signOut(auth);
+
   return (
     <>
-      <Navbar onLogout={handleLogout}onInvite={() => {}} />
+      <Navbar onLogout={handleLogout} onInvite={() => {}} />
       <div className="container py-4">
         <Row className="align-items-center mb-3">
           <Col>
-            <h4 className="mb-0">Boards in this team</h4>
+            <h4 className="mb-0">Boards</h4>
           </Col>
           <Col className="text-end">
             <Button variant="primary" onClick={() => setShowModal(true)}>
@@ -106,14 +134,15 @@ const Dashboard: React.FC = () => {
           </Col>
         </Row>
 
-        {/* ✅ New component */}
-        <BoardsTable
-          boards={boards}
-          onlineCounts={onlineCounts}
-          onRowClick={(boardId) => navigate(`/board/${boardId}`)}
-          onDelete={handleDeleteBoard}
-          user={user}
-        />
+        <div style={{ maxHeight: "600px", overflowY: "auto" }}>
+          <BoardsTable
+            boards={boards}
+            onlineCounts={onlineCounts}
+            onRowClick={(boardId) => navigate(`/board/${boardId}`)}
+            onDelete={handleDeleteBoard}
+            user={user}
+          />
+        </div>
 
         <CreateBoardModal
           show={showModal}
